@@ -38,7 +38,6 @@ export async function POST(req: Request) {
         googlePlaceId: a.googlePlaceId || null,
         statut: a.statut || 'nouveau',
       })),
-      skipDuplicates: true,
     })
     inserted += batch.length
   }
