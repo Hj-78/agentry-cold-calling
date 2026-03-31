@@ -76,8 +76,17 @@ export default function TelPage() {
     )
   }
 
+  if (!session) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
+        <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-slate-500 text-sm">Connexion...</p>
+      </div>
+    )
+  }
+
   // Session active mais plus d'agences dans la queue
-  if (session && !current) {
+  if (!current) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
         <div className="text-5xl mb-2">🎉</div>
@@ -87,15 +96,6 @@ export default function TelPage() {
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-green-500 text-xs">Session toujours active</span>
         </div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
-        <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-500 text-sm">Connexion...</p>
       </div>
     )
   }
