@@ -503,7 +503,15 @@ function QRCodeBlock() {
       setEditUrl(saved)
       return
     }
-    // Sinon : IP locale
+    // Si l'app est accessible depuis l'extérieur (pas localhost), utiliser l'URL courante
+    const hostname = window.location.hostname
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      const auto = `${window.location.origin}/tel`
+      setUrl(auto)
+      setEditUrl(auto)
+      return
+    }
+    // Sinon : IP locale (réseau local)
     fetch('/api/local-ip')
       .then(r => r.json())
       .then(({ ip }) => {
