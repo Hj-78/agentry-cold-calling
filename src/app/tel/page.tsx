@@ -6,17 +6,17 @@ import type { AgenceQueue, Session } from '@/lib/types'
 export default function TelPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [current, setCurrent] = useState<AgenceQueue | null>(null)
-  const [flash, setFlash] = useState(false)
   const [noSession, setNoSession] = useState(false)
+  // readyToCall = true quand un nouveau numéro est détecté → plein écran vert "1 tap"
+  const [readyToCall, setReadyToCall] = useState(false)
   const prevIndexRef = useRef<number>(-1)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const triggerCall = (tel: string) => {
-    // vibrate phone if supported
+  const doCall = (tel: string) => {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate([200, 100, 200])
+      navigator.vibrate([150, 80, 150])
     }
-    // open native dialer
+    setReadyToCall(false)
     window.location.href = `tel:${tel.replace(/\s/g, '')}`
   }
 
@@ -29,6 +29,7 @@ export default function TelPage() {
         setSession(null)
         setCurrent(null)
         setNoSession(true)
+        setReadyToCall(false)
         return
       }
 
@@ -39,13 +40,9 @@ export default function TelPage() {
       const idx = data.totalAppels
       const agence = queue[idx] || null
 
-      // new agency detected → auto call
-      if (idx !== prevIndexRef.current && prevIndexRef.current !== -1) {
-        setFlash(true)
-        setTimeout(() => setFlash(false), 800)
-        if (agence?.telephone) {
-          triggerCall(agence.telephone)
-        }
+      // Nouveau numéro détecté → passer en mode "prêt à appeler"
+      if (prevIndexRef.current !== -1 && idx !== prevIndexRef.current && agence?.telephone) {
+        setReadyToCall(true)
       }
 
       prevIndexRef.current = idx
@@ -64,6 +61,7 @@ export default function TelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ——— PAS DE SESSION ———
   if (noSession) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
@@ -76,6 +74,7 @@ export default function TelPage() {
     )
   }
 
+  // ——— CONNEXION EN COURS ———
   if (!session) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
@@ -85,7 +84,7 @@ export default function TelPage() {
     )
   }
 
-  // Session active mais plus d'agences dans la queue
+  // ——— FILE TERMINÉE ———
   if (!current) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
@@ -104,57 +103,76 @@ export default function TelPage() {
   const idx = session.totalAppels
   const remaining = queue.length - idx
 
+  // ——— MODE "PRÊT À APPELER" — plein écran, 1 tap ———
+  if (readyToCall && current.telephone) {
+    return (
+      <button
+        onClick={() => doCall(current.telephone!)}
+        className="fixed inset-0 bg-green-500 active:bg-green-400 flex flex-col items-center justify-center gap-6 w-full"
+      >
+        <div className="text-white/80 text-sm uppercase tracking-widest font-semibold">Nouveau numéro</div>
+        <div className="text-white text-4xl font-bold text-center px-6 leading-tight">
+          {current.nom}
+        </div>
+        <div className="text-white text-5xl font-mono font-bold tracking-wider">
+          {current.telephone}
+        </div>
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <div className="w-20 h-20 rounded-full bg-white/20 border-4 border-white flex items-center justify-center animate-pulse">
+            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1C10.56 21 3 13.44 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.24 1.01l-2.21 2.21z"/>
+            </svg>
+          </div>
+          <span className="text-white font-bold text-xl">APPUIE POUR APPELER</span>
+        </div>
+      </button>
+    )
+  }
+
+  // ——— VUE NORMALE ———
   return (
-    <div
-      className={`fixed inset-0 flex flex-col transition-colors duration-150 ${
-        flash ? 'bg-green-900' : 'bg-black'
-      }`}
-    >
+    <div className="fixed inset-0 bg-black flex flex-col">
       {/* Status bar */}
-      <div className="flex items-center justify-between px-5 pt-safe pt-4 pb-3 border-b border-slate-800">
+      <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-800 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-green-400 text-sm font-medium">Session active</span>
         </div>
-        <span className="text-slate-400 text-sm">
-          {idx} / {session.objectif} appels
-        </span>
+        <span className="text-slate-400 text-sm">{idx} / {session.objectif}</span>
       </div>
 
-      {/* Agency name */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
-        <p className="text-slate-400 text-sm uppercase tracking-widest">
-          {current.ville || 'Agence'}
-        </p>
-        <h1 className="text-white text-3xl font-bold text-center leading-tight">
-          {current.nom}
-        </h1>
+      {/* Contenu */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5">
+        <p className="text-slate-500 text-xs uppercase tracking-widest">{current.ville || ''}</p>
+        <h1 className="text-white text-3xl font-bold text-center leading-tight">{current.nom}</h1>
 
-        {/* Phone number */}
         <a
           href={`tel:${(current.telephone || '').replace(/\s/g, '')}`}
-          className="text-green-400 text-5xl font-mono font-semibold tracking-wider text-center hover:text-green-300 active:text-green-200"
+          className="text-green-400 text-4xl font-mono font-semibold tracking-wider text-center"
         >
           {current.telephone || '—'}
         </a>
 
-        {/* Call button */}
-        <button
-          onClick={() => current.telephone && triggerCall(current.telephone)}
-          className="mt-4 w-20 h-20 rounded-full bg-green-500 hover:bg-green-400 active:bg-green-600 flex items-center justify-center shadow-lg shadow-green-900 transition-transform active:scale-95"
+        {/* Bouton appeler */}
+        <a
+          href={`tel:${(current.telephone || '').replace(/\s/g, '')}`}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(100)
+          }}
+          className="mt-2 w-24 h-24 rounded-full bg-green-500 active:bg-green-400 flex items-center justify-center shadow-xl shadow-green-900/50"
         >
-          <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
             <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1C10.56 21 3 13.44 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.24 1.01l-2.21 2.21z"/>
           </svg>
-        </button>
+        </a>
 
-        <p className="text-slate-600 text-sm mt-2">
-          {remaining > 0 ? `${remaining} agence${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''}` : 'Dernière agence'}
+        <p className="text-slate-700 text-sm">
+          {remaining > 0 ? `${remaining} restante${remaining > 1 ? 's' : ''}` : 'Dernière agence'}
         </p>
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-slate-800">
+      <div className="h-1 bg-slate-800 flex-shrink-0">
         <div
           className="h-full bg-green-500 transition-all duration-500"
           style={{ width: `${Math.min(100, Math.round((idx / session.objectif) * 100))}%` }}
