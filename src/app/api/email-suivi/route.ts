@@ -23,11 +23,18 @@ export async function POST(req: Request) {
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY || cfg.ANTHROPIC_API_KEY
-    let emailHtml: string
-    let emailSubject: string
 
-    // Génère l'email avec Claude si possible, sinon fallback template
-    let claudeSuccess = false
+    // Valeurs par défaut (fallback si Claude indisponible)
+    let emailSubject = `Suite à notre échange — ${agenceNom}`
+    let emailHtml = `
+      <p>Bonjour,</p>
+      <p>Merci pour notre échange de tout à l'heure.</p>
+      <p>Comme évoqué, notre système prospecte LeBonCoin à votre place : il détecte les nouvelles annonces, contacte les vendeurs automatiquement, et vos agents reçoivent juste les contacts qualifiés.</p>
+      <p>On vous propose <strong>7 jours d'essai gratuits</strong> pour tester ça sur votre secteur. Seriez-vous disponible 10 minutes cette semaine pour une démo ?</p>
+      <p>Cordialement,<br>${agentPrenom || 'L\'équipe Agentry'}</p>
+    `
+
+    // Tente de générer un email personnalisé avec Claude
     if (apiKey) {
       try {
         const client = new Anthropic({ apiKey })
@@ -61,24 +68,10 @@ Réponds UNIQUEMENT avec un JSON valide :
           const parsed = JSON.parse(cleaned)
           emailSubject = parsed.subject
           emailHtml = parsed.html
-          claudeSuccess = true
         }
       } catch {
-        // Fallback vers template si Claude échoue (crédits insuffisants, etc.)
-        claudeSuccess = false
+        // Garde le template par défaut si Claude échoue (crédits insuffisants, etc.)
       }
-    }
-
-    if (!claudeSuccess) {
-      // Template par défaut si pas de clé Claude ou si Claude échoue
-      emailSubject = `Suite à notre échange — ${agenceNom}`
-      emailHtml = `
-        <p>Bonjour,</p>
-        <p>Merci pour notre échange de tout à l'heure.</p>
-        <p>Comme évoqué, notre système prospecte LeBonCoin à votre place : il détecte les nouvelles annonces, contacte les vendeurs automatiquement, et vos agents reçoivent juste les contacts qualifiés.</p>
-        <p>On vous propose <strong>7 jours d'essai gratuits</strong> pour tester ça sur votre secteur. Seriez-vous disponible 10 minutes cette semaine pour une démo ?</p>
-        <p>Cordialement,<br>${agentPrenom || 'L\'équipe Agentry'}</p>
-      `
     }
 
     // Envoie l'email
