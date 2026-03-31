@@ -491,27 +491,31 @@ function QRCodeBlock() {
   const [editing, setEditing] = useState(false)
 
   useEffect(() => {
-    // Priorité : URL sauvegardée dans localStorage
+    const hostname = window.location.hostname
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1'
+
+    // Sur Railway/prod : utiliser l'URL publique (pas de cache local)
+    if (!isLocal) {
+      const auto = `${window.location.origin}/tel`
+      setUrl(auto)
+      setEditUrl(auto)
+      return
+    }
+
+    // En local : vérifier le cache uniquement si c'est une URL HTTP locale
     let saved = localStorage.getItem('qr_url')
-    // Migrate old /appel URLs to /tel
-    if (saved && saved.endsWith('/appel')) {
-      saved = saved.replace(/\/appel$/, '/tel')
-      localStorage.setItem('qr_url', saved)
+    if (saved && saved.endsWith('/appel')) saved = saved.replace(/\/appel$/, '/tel')
+    // Ignorer les URLs HTTPS sauvegardées quand on est en local
+    if (saved && saved.startsWith('https://')) {
+      saved = null
+      localStorage.removeItem('qr_url')
     }
     if (saved) {
       setUrl(saved)
       setEditUrl(saved)
       return
     }
-    // Si l'app est accessible depuis l'extérieur (pas localhost), utiliser l'URL courante
-    const hostname = window.location.hostname
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      const auto = `${window.location.origin}/tel`
-      setUrl(auto)
-      setEditUrl(auto)
-      return
-    }
-    // Sinon : IP locale (réseau local)
+    // IP locale (réseau hotspot/WiFi)
     fetch('/api/local-ip')
       .then(r => r.json())
       .then(({ ip }) => {
