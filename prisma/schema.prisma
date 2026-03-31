@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Agence {
+  id            Int      @id @default(autoincrement())
+  nom           String
+  telephone     String?
+  email         String?
+  adresse       String?
+  ville         String?
+  statut        String   @default("nouveau")
+  notes         String?
+  commentaire   String?
+  reviewCount   Int?
+  averageRating Float?
+  website       String?
+  source        String?
+  googlePlaceId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  appels        Appel[]
+  rappels       Rappel[]
+}
+
+model Appel {
+  id              Int      @id @default(autoincrement())
+  agenceId        Int?
+  agence          Agence?  @relation(fields: [agenceId], references: [id])
+  date            DateTime @default(now())
+  duree           Int?
+  resultat        String?
+  transcription   String?
+  resume          String?
+  pointsCles      String?
+  prochaineAction String?
+  createdAt       DateTime @default(now())
+}
+
+model Rappel {
+  id        Int      @id @default(autoincrement())
+  agenceId  Int?
+  agence    Agence?  @relation(fields: [agenceId], references: [id])
+  dateHeure DateTime
+  note      String?
+  fait      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ObjectifJour {
+  id        Int      @id @default(autoincrement())
+  date      String
+  objectif  Int      @default(50)
+  compteur  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([date])
+}
+
+model Parametre {
+  id     Int    @id @default(autoincrement())
+  cle    String @unique
+  valeur String
+}
+
+model Session {
+  id           Int            @id @default(autoincrement())
+  date         DateTime       @default(now())
+  duree        Int?
+  status       String         @default("active")
+  totalAppels  Int            @default(0)
+  objectif     Int            @default(50)
+  resume       String?
+  agenceQueue  String?        // JSON: [{id, nom, telephone, ville}]
+  createdAt    DateTime       @default(now())
+  appels       SessionAppel[]
+}
+
+model SessionAppel {
+  id              Int      @id @default(autoincrement())
+  sessionId       Int
+  session         Session  @relation(fields: [sessionId], references: [id])
+  ordre           Int      @default(1)
+  agenceId        Int?
+  agenceNom       String?
+  agenceTel       String?
+  transcription   String?
+  resultat        String?
+  resume          String?
+  pointsCles      String?
+  prochaineAction String?
+  duree           Int?
+  aPitche         Boolean? // A-t-on pu pitcher ?
+  rdvPris         Boolean? // Rendez-vous pris ?
+  rdvDate         String?  // Date du RDV (ex: "2024-01-15")
+  rdvHeure        String?  // Heure du RDV (ex: "14:00")
+  agenceEmail     String?  // Email de l'agence (pour auto-envoi)
+  noteRapide      String?  // Note manuelle rapide
+  createdAt       DateTime @default(now())
+}

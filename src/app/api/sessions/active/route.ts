@@ -1,0 +1,14 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+
+export async function GET() {
+  const session = await prisma.session.findFirst({
+    where: { status: 'active' },
+    include: { appels: { orderBy: { ordre: 'asc' } } },
+  })
+  if (!session) return NextResponse.json(null)
+  return NextResponse.json({
+    ...session,
+    agenceQueue: session.agenceQueue ? JSON.parse(session.agenceQueue) : null,
+  })
+}

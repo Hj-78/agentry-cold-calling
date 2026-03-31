@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cold-calling-app",
+      "runtimeExecutable": "/Users/hugojalta/.local/node-v20.11.0-darwin-arm64/bin/node",
+      "runtimeArgs": ["node_modules/.bin/next", "dev"],
+      "port": 3000,
+      "autoPort": false
+    }
+  ]
+}
