@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 
 // Google OAuth callback supprimé — l'app utilise désormais iCloud Calendar (CalDAV)
