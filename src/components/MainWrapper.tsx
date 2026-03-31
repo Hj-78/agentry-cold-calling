@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 
-const NO_NAV_PATHS = ['/appel']
+const NO_NAV_PATHS = ['/appel', '/tel']
 
 export default function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import Navigation from '@/components/Navigation'
 
 // Pages sans navigation (mode standalone téléphone)
-const NO_NAV_PATHS = ['/appel']
+const NO_NAV_PATHS = ['/appel', '/tel']
 
 export default function ConditionalNav() {
   const pathname = usePathname()

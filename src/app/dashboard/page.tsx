@@ -492,7 +492,12 @@ function QRCodeBlock() {
 
   useEffect(() => {
     // Priorité : URL sauvegardée dans localStorage
-    const saved = localStorage.getItem('qr_url')
+    let saved = localStorage.getItem('qr_url')
+    // Migrate old /appel URLs to /tel
+    if (saved && saved.endsWith('/appel')) {
+      saved = saved.replace(/\/appel$/, '/tel')
+      localStorage.setItem('qr_url', saved)
+    }
     if (saved) {
       setUrl(saved)
       setEditUrl(saved)
@@ -503,13 +508,13 @@ function QRCodeBlock() {
       .then(r => r.json())
       .then(({ ip }) => {
         const port = window.location.port
-        const auto = `http://${ip}${port ? `:${port}` : ''}/appel`
+        const auto = `http://${ip}${port ? `:${port}` : ''}/tel`
         setUrl(auto)
         setEditUrl(auto)
       })
       .catch(() => {
         const port = window.location.port
-        const fallback = `http://localhost${port ? `:${port}` : ''}/appel`
+        const fallback = `http://localhost${port ? `:${port}` : ''}/tel`
         setUrl(fallback)
         setEditUrl(fallback)
       })
@@ -518,8 +523,8 @@ function QRCodeBlock() {
   function saveUrl() {
     const trimmed = editUrl.trim()
     if (!trimmed) return
-    // Ajouter /appel si l'URL ne se termine pas déjà par /appel
-    const final = trimmed.endsWith('/appel') ? trimmed : trimmed.replace(/\/$/, '') + '/appel'
+    // Ajouter /tel si l'URL ne se termine pas déjà par /tel
+    const final = trimmed.endsWith('/tel') ? trimmed : trimmed.replace(/\/$/, '') + '/tel'
     setUrl(final)
     setEditUrl(final)
     localStorage.setItem('qr_url', final)
@@ -532,7 +537,7 @@ function QRCodeBlock() {
     fetch('/api/local-ip')
       .then(r => r.json())
       .then(({ ip }) => {
-        const auto = `http://${ip}${port ? `:${port}` : ''}/appel`
+        const auto = `http://${ip}${port ? `:${port}` : ''}/tel`
         setUrl(auto)
         setEditUrl(auto)
       })
