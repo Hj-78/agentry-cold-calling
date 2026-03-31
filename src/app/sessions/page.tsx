@@ -33,17 +33,21 @@ export default function SessionsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [launching, setLaunching] = useState(false)
   const [objectif, setObjectif] = useState(50)
+  const [disponibles, setDisponibles] = useState<number | null>(null)
   const OBJECTIF_MIN = 50
 
   const fetchData = async () => {
-    const [listRes, activeRes] = await Promise.all([
+    const [listRes, activeRes, agencesRes] = await Promise.all([
       fetch('/api/sessions'),
       fetch('/api/sessions/active'),
+      fetch('/api/agences?statut=nouveau&count=1'),
     ])
     const list = await listRes.json()
     const active = await activeRes.json()
+    const agencesData = await agencesRes.json().catch(() => null)
     setSessions(Array.isArray(list) ? list.filter((s: Session) => s.status === 'ended') : [])
     setActiveSession(active)
+    if (agencesData && typeof agencesData.total === 'number') setDisponibles(agencesData.total)
     setLoading(false)
   }
 
@@ -57,6 +61,11 @@ export default function SessionsPage() {
       body: JSON.stringify({ objectif }),
     })
     const session = await res.json()
+    if (!session.agenceQueue || session.agenceQueue.length === 0) {
+      setDisponibles(0)
+      setLaunching(false)
+      return
+    }
     setActiveSession(session)
     setLaunching(false)
   }
@@ -136,10 +145,19 @@ export default function SessionsPage() {
           </div>
         </div>
 
+        {disponibles === 0 && (
+          <div className="mb-4 bg-amber-950/60 border border-amber-700/50 rounded-xl px-4 py-3 text-amber-300 text-sm">
+            ⚠️ Aucune agence disponible — toutes ont été appelées ou il n&apos;y a pas d&apos;agences avec un numéro.<br />
+            <span className="text-amber-500 text-xs">Va dans <strong>Agences</strong> pour en importer de nouvelles.</span>
+          </div>
+        )}
+        {disponibles !== null && disponibles > 0 && (
+          <p className="text-slate-500 text-xs mb-3 text-center">{disponibles} agence{disponibles > 1 ? 's' : ''} disponible{disponibles > 1 ? 's' : ''}</p>
+        )}
         <button
           onClick={launchSession}
-          disabled={launching}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-5 rounded-2xl font-bold text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50"
+          disabled={launching || disponibles === 0}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50"
         >
           {launching ? 'Démarrage…' : '▶ Lancer la session'}
         </button>

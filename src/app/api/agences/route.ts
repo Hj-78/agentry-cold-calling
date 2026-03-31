@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const statut = searchParams.get('statut')
   const search = searchParams.get('search')?.trim()
+  const countOnly = searchParams.get('count') === '1'
 
   const where: Record<string, unknown> = {}
   if (statut) where.statut = statut
@@ -15,6 +16,13 @@ export async function GET(req: NextRequest) {
       { ville: { contains: search } },
       { telephone: { contains: search } },
     ]
+  }
+
+  if (countOnly) {
+    // Only count agencies with a phone number (eligible for session)
+    const withPhone = { ...where, telephone: { not: null } }
+    const total = await prisma.agence.count({ where: Object.keys(withPhone).length ? withPhone : undefined })
+    return NextResponse.json({ total })
   }
 
   const agences = await prisma.agence.findMany({

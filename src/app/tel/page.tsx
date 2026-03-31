@@ -76,7 +76,22 @@ export default function TelPage() {
     )
   }
 
-  if (!session || !current) {
+  // Session active mais plus d'agences dans la queue
+  if (session && !current) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
+        <div className="text-5xl mb-2">🎉</div>
+        <p className="text-white text-xl font-bold">File d&apos;appels terminée !</p>
+        <p className="text-slate-500 text-sm text-center px-8">Termine la session sur le PC.</p>
+        <div className="mt-4 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-green-500 text-xs">Session toujours active</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
         <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
