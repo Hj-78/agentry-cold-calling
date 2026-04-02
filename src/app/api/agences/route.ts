@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   const statut = searchParams.get('statut')
   const search = searchParams.get('search')?.trim()
   const countOnly = searchParams.get('count') === '1'
+  const citiesOnly = searchParams.get('cities') === '1'
 
   const where: Record<string, unknown> = {}
   if (statut) where.statut = statut
@@ -18,8 +19,18 @@ export async function GET(req: NextRequest) {
     ]
   }
 
+  // Retourner les villes avec le nombre d'agences "nouveau" ayant un téléphone
+  if (citiesOnly) {
+    const rows = await prisma.agence.groupBy({
+      by: ['ville'],
+      where: { statut: 'nouveau', telephone: { not: null } },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    })
+    return NextResponse.json(rows.map(r => ({ ville: r.ville, count: r._count.id })))
+  }
+
   if (countOnly) {
-    // Only count agencies with a phone number (eligible for session)
     const withPhone = { ...where, telephone: { not: null } }
     const total = await prisma.agence.count({ where: Object.keys(withPhone).length ? withPhone : undefined })
     return NextResponse.json({ total })

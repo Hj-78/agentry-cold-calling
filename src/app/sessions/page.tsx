@@ -26,6 +26,8 @@ function formatDate(dateStr: string) {
   })
 }
 
+interface CityCount { ville: string | null; count: number }
+
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSession, setActiveSession] = useState<Session | null>(null)
@@ -34,31 +36,48 @@ export default function SessionsPage() {
   const [launching, setLaunching] = useState(false)
   const [objectif, setObjectif] = useState(50)
   const [disponibles, setDisponibles] = useState<number | null>(null)
-  const OBJECTIF_MIN = 50
+  const [villes, setVilles] = useState<CityCount[]>([])
+  const [villeChoisie, setVilleChoisie] = useState<string>('') // '' = toutes
+  const OBJECTIF_MIN = 10
 
   const fetchData = async () => {
-    const [listRes, activeRes, agencesRes] = await Promise.all([
+    const [listRes, activeRes, agencesRes, villesRes] = await Promise.all([
       fetch('/api/sessions'),
       fetch('/api/sessions/active'),
       fetch('/api/agences?statut=nouveau&count=1'),
+      fetch('/api/agences?cities=1'),
     ])
     const list = await listRes.json()
     const active = await activeRes.json()
     const agencesData = await agencesRes.json().catch(() => null)
+    const villesData = await villesRes.json().catch(() => [])
     setSessions(Array.isArray(list) ? list.filter((s: Session) => s.status === 'ended') : [])
     setActiveSession(active)
     if (agencesData && typeof agencesData.total === 'number') setDisponibles(agencesData.total)
+    if (Array.isArray(villesData)) setVilles(villesData)
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
+
+  // Quand on choisit une ville, mettre à jour l'objectif au count de cette ville
+  useEffect(() => {
+    if (villeChoisie) {
+      const v = villes.find(v => v.ville === villeChoisie)
+      if (v) setObjectif(v.count)
+    }
+  }, [villeChoisie, villes])
+
+  const dispoCette = villeChoisie
+    ? (villes.find(v => v.ville === villeChoisie)?.count ?? 0)
+    : (disponibles ?? 0)
 
   const launchSession = async () => {
     setLaunching(true)
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ objectif }),
+      body: JSON.stringify({ objectif, ville: villeChoisie || null }),
     })
     const session = await res.json()
     if (!session.agenceQueue || session.agenceQueue.length === 0) {
@@ -115,51 +134,79 @@ export default function SessionsPage() {
       {/* Lancer une session */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 mb-8">
         <h2 className="text-white font-semibold text-xl mb-1">Lancer une session</h2>
-        <p className="text-slate-500 text-sm mb-8">Transcription automatique · Analyse IA · Résumé de fin de session</p>
+        <p className="text-slate-500 text-sm mb-6">Transcription automatique · Analyse IA · Résumé de fin de session</p>
 
-        <div className="flex items-center gap-5 mb-8">
+        {/* Sélecteur de ville */}
+        {villes.length > 0 && (
+          <div className="mb-6">
+            <label className="text-slate-400 text-sm block mb-3">📍 Ville à appeler</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { setVilleChoisie(''); setObjectif(Math.min(disponibles ?? 50, 50)) }}
+                className={`py-3 px-4 rounded-xl text-sm font-semibold transition border ${
+                  villeChoisie === ''
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                }`}
+              >
+                <div>🌍 Toutes les villes</div>
+                <div className="text-xs font-normal opacity-70 mt-0.5">{disponibles ?? '…'} agences</div>
+              </button>
+              {villes.map(v => (
+                <button
+                  key={v.ville}
+                  onClick={() => setVilleChoisie(v.ville ?? '')}
+                  className={`py-3 px-4 rounded-xl text-sm font-semibold transition border text-left ${
+                    villeChoisie === v.ville
+                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                  }`}
+                >
+                  <div className="truncate">{v.ville?.replace(/^\d{5}\s/, '') ?? '—'}</div>
+                  <div className="text-xs font-normal opacity-70 mt-0.5">{v.count} agence{v.count > 1 ? 's' : ''}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Objectif */}
+        <div className="flex items-center gap-4 mb-6">
           <div>
             <label className="text-slate-400 text-sm block mb-2">Objectif d&apos;appels</label>
             <div className="flex items-center gap-3">
               <input
                 type="number"
-                min={OBJECTIF_MIN}
+                min={1}
                 max={500}
                 value={objectif}
-                onChange={e => {
-                  const val = parseInt(e.target.value) || OBJECTIF_MIN
-                  setObjectif(Math.max(OBJECTIF_MIN, val))
-                }}
-                onBlur={e => {
-                  const val = parseInt(e.target.value) || OBJECTIF_MIN
-                  if (val < OBJECTIF_MIN) setObjectif(OBJECTIF_MIN)
-                }}
-                className="w-28 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-xl font-bold text-center"
+                onChange={e => setObjectif(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-24 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-xl font-bold text-center"
               />
               <span className="text-slate-500 text-base">appels</span>
             </div>
-            {objectif > OBJECTIF_MIN && (
-              <p className="text-indigo-400 text-xs mt-1">+{objectif - OBJECTIF_MIN} au-delà du minimum</p>
-            )}
-            <p className="text-slate-600 text-xs mt-1">Minimum : {OBJECTIF_MIN} appels</p>
           </div>
+          {villeChoisie && (
+            <div className="flex-1 bg-indigo-900/30 border border-indigo-700/40 rounded-xl px-4 py-3">
+              <div className="text-indigo-300 text-xs font-semibold mb-0.5">Ville sélectionnée</div>
+              <div className="text-white font-bold text-sm">{villeChoisie.replace(/^\d{5}\s/, '')}</div>
+              <div className="text-indigo-400 text-xs">{dispoCette} agences dispo</div>
+            </div>
+          )}
         </div>
 
-        {disponibles === 0 && (
+        {dispoCette === 0 && (
           <div className="mb-4 bg-amber-950/60 border border-amber-700/50 rounded-xl px-4 py-3 text-amber-300 text-sm">
-            ⚠️ Aucune agence disponible — toutes ont été appelées ou il n&apos;y a pas d&apos;agences avec un numéro.<br />
-            <span className="text-amber-500 text-xs">Va dans <strong>Agences</strong> pour en importer de nouvelles.</span>
+            ⚠️ {villeChoisie ? 'Toutes les agences de cette ville ont été appelées.' : 'Aucune agence disponible.'}
           </div>
         )}
-        {disponibles !== null && disponibles > 0 && (
-          <p className="text-slate-500 text-xs mb-3 text-center">{disponibles} agence{disponibles > 1 ? 's' : ''} disponible{disponibles > 1 ? 's' : ''}</p>
-        )}
+
         <button
           onClick={launchSession}
-          disabled={launching || disponibles === 0}
+          disabled={launching || dispoCette === 0}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50"
         >
-          {launching ? 'Démarrage…' : '▶ Lancer la session'}
+          {launching ? 'Démarrage…' : villeChoisie ? `▶ Lancer — ${villeChoisie.replace(/^\d{5}\s/, '')}` : '▶ Lancer la session'}
         </button>
       </div>
 
