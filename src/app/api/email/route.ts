@@ -18,19 +18,26 @@ export async function POST(req: Request) {
   const cfg: Record<string, string> = {}
   params.forEach(p => { cfg[p.cle] = p.valeur })
 
-  if (!cfg.SMTP_HOST || !cfg.SMTP_USER || !cfg.SMTP_PASS) {
+  // Fallback to Gmail env vars if DB not configured
+  const smtpHost = cfg.SMTP_HOST || 'smtp.gmail.com'
+  const smtpPort = parseInt(cfg.SMTP_PORT || '587')
+  const smtpUser = cfg.SMTP_USER || process.env.GMAIL_USER || ''
+  const smtpPass = cfg.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || ''
+  const smtpFrom = cfg.SMTP_FROM || smtpUser
+
+  if (!smtpUser || !smtpPass) {
     return NextResponse.json({ error: 'SMTP non configuré. Configure ton email dans Paramètres.' }, { status: 400 })
   }
 
   const transporter = nodemailer.createTransport({
-    host: cfg.SMTP_HOST,
-    port: parseInt(cfg.SMTP_PORT || '587'),
-    secure: cfg.SMTP_PORT === '465',
-    auth: { user: cfg.SMTP_USER, pass: cfg.SMTP_PASS },
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: { user: smtpUser, pass: smtpPass },
   })
 
   await transporter.sendMail({
-    from: cfg.SMTP_FROM || cfg.SMTP_USER,
+    from: `Hugo - Agentry <${smtpFrom}>`,
     to,
     subject,
     html,
