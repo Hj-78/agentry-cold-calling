@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Session, AgenceQueue } from '@/lib/types'
+import type { EmailTemplate } from '@/lib/email-templates'
+
+function applyVars(text: string, vars: Record<string, string>) {
+  return Object.entries(vars).reduce((t, [k, v]) => t.replaceAll(`{{${k}}}`, v), text)
+}
 
 interface PowerDialerProps {
   session: Session
@@ -51,6 +56,18 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [rappelPlage, setRappelPlage] = useState('')
   const [emailSuiviLoading, setEmailSuiviLoading] = useState(false)
   const [emailSuiviSent, setEmailSuiviSent] = useState(false)
+
+  // Modal email dans la session
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailModalTemplates, setEmailModalTemplates] = useState<EmailTemplate[]>([])
+  const [emailModalTemplateId, setEmailModalTemplateId] = useState('')
+  const [emailModalTo, setEmailModalTo] = useState('')
+  const [emailModalSubject, setEmailModalSubject] = useState('')
+  const [emailModalBody, setEmailModalBody] = useState('')
+  const [emailModalSending, setEmailModalSending] = useState(false)
+  const [emailModalSent, setEmailModalSent] = useState(false)
+  const [emailModalError, setEmailModalError] = useState('')
+  const [emailModalLoaded, setEmailModalLoaded] = useState(false)
   const [endedSession, setEndedSession] = useState<Session | null>(null)
   const [expediteur, setExpediteur] = useState('')
   const [queueIndex, setQueueIndex] = useState(initialSession.appels.length)
@@ -135,6 +152,22 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
     } catch { /* silencieux */ }
     setAiLoading(false)
   }
+
+  // Charger les templates au premier ouverture de la modal email
+  useEffect(() => {
+    if (!showEmailModal || emailModalLoaded) return
+    setEmailModalLoaded(true)
+    fetch('/api/email-templates').then(r => r.json()).then(setEmailModalTemplates).catch(() => {})
+  }, [showEmailModal, emailModalLoaded])
+
+  // Recalculer sujet/corps quand le template change dans la modal
+  useEffect(() => {
+    const t = emailModalTemplates.find(t => t.id === emailModalTemplateId)
+    if (!t) return
+    const vars = { agence: currentAgence?.nom || '', expediteur }
+    setEmailModalSubject(applyVars(t.sujet, vars))
+    setEmailModalBody(applyVars(t.corps, vars))
+  }, [emailModalTemplateId, emailModalTemplates, currentAgence?.nom, expediteur])
 
   useEffect(() => {
     if (rdvPris && currentAgence) {
@@ -478,6 +511,24 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
             ))}
           </div>
 
+          {/* Bouton email rapide */}
+          <button
+            type="button"
+            onClick={() => {
+              const agenceEmail = (currentAgence as unknown as { email?: string })?.email || ''
+              setEmailModalTo(agenceEmail)
+              setEmailModalTemplateId('')
+              setEmailModalSubject('')
+              setEmailModalBody('')
+              setEmailModalSent(false)
+              setEmailModalError('')
+              setShowEmailModal(true)
+            }}
+            className="w-full py-2.5 rounded-xl text-sm font-medium transition border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white flex items-center justify-center gap-2"
+          >
+            ✉️ Composer un email
+          </button>
+
           {/* Pitché + RDV */}
           <div className="flex gap-3">
             <button onClick={() => setAPitche(aPitche === true ? null : true)}
@@ -783,6 +834,125 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
               <button onClick={() => setShowRappelModal(false)}
                 className="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-xl text-sm font-bold transition">
                 {rappelJour || rappelPlage ? '✓ Enregistrer' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal email dans la session */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-end justify-center">
+          <div className="bg-slate-900 border border-slate-700 rounded-t-3xl w-full max-w-lg max-h-[90vh] flex flex-col">
+
+            {/* Header modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
+              <div>
+                <h3 className="text-white font-bold text-lg">✉️ Envoyer un email</h3>
+                {currentAgence && <p className="text-slate-500 text-xs mt-0.5">{currentAgence.nom}</p>}
+              </div>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="text-slate-500 hover:text-white text-2xl leading-none transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Corps modal — scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+              {/* Templates */}
+              {emailModalTemplates.length > 0 && (
+                <div>
+                  <label className="text-slate-400 text-xs font-medium block mb-2">Template</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {emailModalTemplates.map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setEmailModalTemplateId(emailModalTemplateId === t.id ? '' : t.id)}
+                        className={`text-left px-4 py-3 rounded-xl border transition text-sm ${
+                          emailModalTemplateId === t.id
+                            ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="font-semibold">{t.nom}</div>
+                        {t.objection && <div className="text-xs text-slate-500 mt-0.5">Objection : {t.objection}</div>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Destinataire */}
+              <div>
+                <label className="text-slate-400 text-xs font-medium block mb-1.5">Destinataire</label>
+                <input
+                  type="email"
+                  value={emailModalTo}
+                  onChange={e => setEmailModalTo(e.target.value)}
+                  placeholder="contact@agence.com"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Objet */}
+              <div>
+                <label className="text-slate-400 text-xs font-medium block mb-1.5">Objet</label>
+                <input
+                  type="text"
+                  value={emailModalSubject}
+                  onChange={e => setEmailModalSubject(e.target.value)}
+                  placeholder="Objet de l'email…"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Corps */}
+              <div>
+                <label className="text-slate-400 text-xs font-medium block mb-1.5">Message (HTML)</label>
+                <textarea
+                  rows={6}
+                  value={emailModalBody}
+                  onChange={e => setEmailModalBody(e.target.value)}
+                  placeholder="<p>Bonjour,</p>"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono placeholder-slate-600 focus:outline-none focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              {emailModalError && (
+                <div className="bg-red-900/30 border border-red-500/50 rounded-xl px-4 py-3 text-red-400 text-sm">
+                  ⚠️ {emailModalError}
+                </div>
+              )}
+            </div>
+
+            {/* Footer modal — bouton envoyer */}
+            <div className="px-6 py-4 border-t border-slate-800 flex-shrink-0">
+              <button
+                disabled={emailModalSending || !emailModalTo || !emailModalSubject || !emailModalBody || emailModalSent}
+                onClick={async () => {
+                  setEmailModalError('')
+                  setEmailModalSending(true)
+                  try {
+                    const res = await fetch('/api/email', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ to: emailModalTo, subject: emailModalSubject, html: emailModalBody }),
+                    })
+                    const data = await res.json()
+                    if (!res.ok) { setEmailModalError(data.error || 'Erreur envoi') }
+                    else { setEmailModalSent(true); setTimeout(() => setShowEmailModal(false), 1500) }
+                  } catch {
+                    setEmailModalError('Erreur réseau')
+                  }
+                  setEmailModalSending(false)
+                }}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-4 rounded-2xl font-bold text-base transition"
+              >
+                {emailModalSending ? 'Envoi…' : emailModalSent ? '✅ Email envoyé !' : '📤 Envoyer'}
               </button>
             </div>
           </div>

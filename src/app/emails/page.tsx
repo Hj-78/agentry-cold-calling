@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { EmailTemplate } from '@/lib/email-templates'
 
 interface Agence {
@@ -22,6 +22,8 @@ export default function EmailsPage() {
   const [agences, setAgences] = useState<Agence[]>([])
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [agenceId, setAgenceId] = useState('')
+  const [agenceSearch, setAgenceSearch] = useState('')
+  const [showAgenceDropdown, setShowAgenceDropdown] = useState(false)
   const [templateId, setTemplateId] = useState('')
   const [to, setTo] = useState('')
   const [subject, setSubject] = useState('')
@@ -34,6 +36,8 @@ export default function EmailsPage() {
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
   const [savingTemplates, setSavingTemplates] = useState(false)
 
+  const agenceSearchRef = useRef<HTMLDivElement>(null)
+
   // Settings
   const [expediteur, setExpediteur] = useState('')
 
@@ -44,6 +48,18 @@ export default function EmailsPage() {
       setExpediteur(d.SMTP_FROM || d.SMTP_USER || '')
     })
   }, [])
+
+  // Fermer le dropdown agence si clic en dehors
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (agenceSearchRef.current && !agenceSearchRef.current.contains(e.target as Node)) {
+      setShowAgenceDropdown(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [handleClickOutside])
 
   const selectedAgence = agences.find(a => String(a.id) === agenceId)
 
@@ -153,21 +169,66 @@ export default function EmailsPage() {
       {tab === 'composer' && (
         <form onSubmit={handleSend} className="space-y-6">
 
-          {/* Agence */}
+          {/* Agence — combobox avec recherche */}
           <div>
             <label className="text-slate-400 text-sm font-medium block mb-2">Agence</label>
-            <select
-              value={agenceId}
-              onChange={e => setAgenceId(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-slate-200 text-base focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">— Sélectionner une agence —</option>
-              {agences.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.nom}{a.ville ? ` — ${a.ville}` : ''}
-                </option>
-              ))}
-            </select>
+            <div className="relative" ref={agenceSearchRef}>
+              <input
+                type="text"
+                value={agenceSearch}
+                onChange={e => {
+                  setAgenceSearch(e.target.value)
+                  setAgenceId('')
+                  setShowAgenceDropdown(true)
+                }}
+                onFocus={() => setShowAgenceDropdown(true)}
+                placeholder={selectedAgence ? `${selectedAgence.nom}${selectedAgence.ville ? ` — ${selectedAgence.ville}` : ''}` : '🔍 Rechercher une agence…'}
+                className={`w-full bg-slate-900 border rounded-2xl px-5 py-4 text-base focus:outline-none focus:border-indigo-500 transition ${
+                  selectedAgence ? 'border-indigo-500 text-white' : 'border-slate-800 text-slate-300 placeholder-slate-500'
+                }`}
+              />
+              {selectedAgence && (
+                <button
+                  type="button"
+                  onClick={() => { setAgenceId(''); setAgenceSearch(''); setTo('') }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xl leading-none"
+                >
+                  ✕
+                </button>
+              )}
+              {showAgenceDropdown && !selectedAgence && (
+                <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl max-h-64 overflow-y-auto">
+                  {agences
+                    .filter(a => {
+                      const q = agenceSearch.toLowerCase()
+                      return !q || a.nom.toLowerCase().includes(q) || (a.ville || '').toLowerCase().includes(q)
+                    })
+                    .slice(0, 50)
+                    .map(a => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => {
+                          setAgenceId(String(a.id))
+                          setAgenceSearch('')
+                          setShowAgenceDropdown(false)
+                        }}
+                        className="w-full text-left px-5 py-3.5 hover:bg-slate-700 transition text-sm border-b border-slate-700/50 last:border-0"
+                      >
+                        <span className="text-white font-medium">{a.nom}</span>
+                        {a.ville && <span className="text-slate-400 ml-2">— {a.ville}</span>}
+                        {a.email && <span className="text-indigo-400 text-xs ml-2">{a.email}</span>}
+                      </button>
+                    ))}
+                  {agences.filter(a => {
+                    const q = agenceSearch.toLowerCase()
+                    return !q || a.nom.toLowerCase().includes(q) || (a.ville || '').toLowerCase().includes(q)
+                  }).length === 0 && (
+                    <div className="px-5 py-4 text-slate-500 text-sm">Aucune agence trouvée</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Template */}
