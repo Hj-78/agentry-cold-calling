@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "next dev -H 0.0.0.0",
+    "build": "prisma generate && next build",
+    "start": "prisma db push && node prisma/seed.js && next start",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
