@@ -649,9 +649,9 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
               <div>
                 <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
                 <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                  <p>« On a créé un système qui <span className="text-green-300 font-medium">prospecte LeBonCoin à votre place</span> — il détecte les nouvelles annonces, contacte les vendeurs automatiquement, et vos agents reçoivent juste les contacts qualifiés. <span className="text-green-300">Vos agents ne touchent plus à LeBonCoin.</span> »</p>
+                  <p>« On a remarqué que les agents immobiliers perdent beaucoup de temps à <span className="text-green-300 font-medium">prospecter manuellement sur LeBonCoin</span>. Nous on a créé un système qui fait ça à votre place — vos agents reçoivent directement les contacts qualifiés, <span className="text-green-300">sans toucher à LeBonCoin.</span> »</p>
                   <p className="text-slate-500 italic text-xs">(Laisser répondre.)</p>
-                  <p className="mt-1">« On cherche des agences partenaires dans votre région pour tester ça <span className="text-green-300 font-medium">7 jours gratuitement</span>. Est-ce que vous avez <span className="text-green-300 font-medium">5 à 10 minutes</span> cette semaine pour qu&apos;on vous montre comment ça marche ? »</p>
+                  <p className="mt-1">« On cherche des agences partenaires pour tester ça <span className="text-green-300 font-medium">7 jours gratuitement</span>. Vous auriez <span className="text-green-300 font-medium">5 à 10 minutes</span> cette semaine pour qu&apos;on vous montre comment ça marche ? »</p>
                 </div>
               </div>
 
