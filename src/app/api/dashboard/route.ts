@@ -2,8 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// Jours actifs : lundi(1), mardi(2), jeudi(4), vendredi(5), samedi(6)
-const JOURS_ACTIFS = [1, 2, 4, 5, 6]
+const JOURS_ACTIFS = [1, 2, 4, 5, 6] // lun, mar, jeu, ven, sam
 const OBJECTIF_MIN = 50
 
 function todayStr() {
@@ -13,6 +12,26 @@ function todayStr() {
 function isJourActif(dateStr: string) {
   const d = new Date(dateStr + 'T12:00:00')
   return JOURS_ACTIFS.includes(d.getDay())
+}
+
+function startOf(unit: 'day' | 'week' | 'month') {
+  const d = new Date()
+  if (unit === 'day') { d.setHours(0, 0, 0, 0); return d }
+  if (unit === 'week') { d.setDate(d.getDate() - 7); d.setHours(0, 0, 0, 0); return d }
+  if (unit === 'month') { d.setDate(d.getDate() - 30); d.setHours(0, 0, 0, 0); return d }
+  return d
+}
+
+function calcStats(appels: { resultat: string | null; aPitche: boolean | null; rdvPris: boolean | null }[]) {
+  return {
+    totalAppels: appels.length,
+    interesses: appels.filter(a => a.resultat === 'interesse').length,
+    pasInteresses: appels.filter(a => a.resultat === 'pas_interesse').length,
+    rdvs: appels.filter(a => a.rdvPris).length,
+    pitches: appels.filter(a => a.aPitche).length,
+    rappeler: appels.filter(a => a.resultat === 'rappeler').length,
+    messagerie: appels.filter(a => a.resultat === 'messagerie' || a.resultat === 'absent').length,
+  }
 }
 
 async function getOrCreateToday() {
@@ -25,7 +44,6 @@ async function getOrCreateToday() {
 }
 
 async function calcStreak() {
-  // Récupère les 60 derniers jours pour calculer la série
   const since = new Date()
   since.setDate(since.getDate() - 60)
   const sinceStr = since.toISOString().split('T')[0]
@@ -36,26 +54,20 @@ async function calcStreak() {
   const byDate: Record<string, number> = {}
   rows.forEach(r => { byDate[r.date] = r.compteur })
 
-  // Parcourt les jours actifs en arrière depuis hier
   let streak = 0
   const today = todayStr()
   const cur = new Date()
-  cur.setDate(cur.getDate() - 1) // commence à hier
+  cur.setDate(cur.getDate() - 1)
 
   for (let i = 0; i < 60; i++) {
     const ds = cur.toISOString().split('T')[0]
     if (ds >= today) { cur.setDate(cur.getDate() - 1); continue }
     if (isJourActif(ds)) {
       const count = byDate[ds] ?? 0
-      if (count >= OBJECTIF_MIN) {
-        streak++
-      } else {
-        break
-      }
+      if (count >= OBJECTIF_MIN) { streak++ } else { break }
     }
     cur.setDate(cur.getDate() - 1)
   }
-  // Si aujourd'hui est un jour actif et objectif atteint, ça compte aussi
   const todayCount = byDate[today] ?? 0
   if (isJourActif(today) && todayCount >= OBJECTIF_MIN) streak++
   return streak
@@ -65,23 +77,38 @@ export async function GET() {
   const today = await getOrCreateToday()
   const streak = await calcStreak()
 
-  // Stats 7 derniers jours
+  // ── AUJOURD'HUI ─────────────────────────────────────────
+  const dayStart = startOf('day')
+  const dayAppels = await prisma.sessionAppel.findMany({
+    where: { createdAt: { gte: dayStart } },
+    select: { resultat: true, aPitche: true, rdvPris: true },
+  })
+  const dayStats = calcStats(dayAppels)
+
+  // Sync objectifJour.compteur avec le vrai compte du jour (fiabilité)
+  if (today.compteur !== dayStats.totalAppels && dayStats.totalAppels > 0) {
+    await prisma.objectifJour.update({
+      where: { id: today.id },
+      data: { compteur: dayStats.totalAppels },
+    }).catch(() => {})
+  }
+
+  // ── SEMAINE (7 derniers jours) ───────────────────────────
+  const weekStart = startOf('week')
+  const weekAppels = await prisma.sessionAppel.findMany({
+    where: { createdAt: { gte: weekStart } },
+    select: { resultat: true, aPitche: true, rdvPris: true, createdAt: true },
+  })
+  const weekStats = calcStats(weekAppels)
+
+  // Jours actifs de la semaine courante avec barres
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0]
-
   const weekData = await prisma.objectifJour.findMany({
     where: { date: { gte: sevenDaysAgoStr } },
     orderBy: { date: 'asc' },
   })
-
-  const totalAppels = weekData.reduce((sum, d) => sum + d.compteur, 0)
-  const joursActifs = weekData.filter((d) => d.compteur >= OBJECTIF_MIN && isJourActif(d.date)).length
-  const moyenneJour = weekData.filter(d => d.compteur > 0).length > 0
-    ? Math.round(totalAppels / weekData.filter(d => d.compteur > 0).length)
-    : 0
-
-  // Jours actifs de la semaine en cours (lun-sam selon règle)
   const semaineJours: { date: string; compteur: number; objectifAtteint: boolean; isToday: boolean }[] = []
   for (let i = 6; i >= 0; i--) {
     const d = new Date()
@@ -98,36 +125,50 @@ export async function GET() {
     }
   }
 
-  // Stats conversion de la semaine (depuis SessionAppel)
-  const weekAppels = await prisma.sessionAppel.findMany({
-    where: { createdAt: { gte: sevenDaysAgo } },
-    select: { resultat: true, aPitche: true, rdvPris: true },
-  })
-  const pitchesWeek = weekAppels.filter(a => a.aPitche).length
-  const interessesWeek = weekAppels.filter(a => a.resultat === 'interesse').length
-  const rdvsWeek = weekAppels.filter(a => a.rdvPris).length
+  // Moyenne par jour actif cette semaine
+  const joursAvecAppels = [...new Set(
+    weekAppels.map(a => a.createdAt.toISOString().split('T')[0])
+  )].length
+  const moyenneJour = joursAvecAppels > 0 ? Math.round(weekStats.totalAppels / joursAvecAppels) : 0
+  const joursActifs = weekData.filter(d => d.compteur >= OBJECTIF_MIN && isJourActif(d.date)).length
 
-  // Dernière session terminée
+  // ── MOIS (30 derniers jours) ─────────────────────────────
+  const monthStart = startOf('month')
+  const monthAppels = await prisma.sessionAppel.findMany({
+    where: { createdAt: { gte: monthStart } },
+    select: { resultat: true, aPitche: true, rdvPris: true, createdAt: true },
+  })
+  const monthStats = calcStats(monthAppels)
+  const joursAvecAppelsMois = [...new Set(
+    monthAppels.map(a => a.createdAt.toISOString().split('T')[0])
+  )].length
+  const moyenneJourMois = joursAvecAppelsMois > 0 ? Math.round(monthStats.totalAppels / joursAvecAppelsMois) : 0
+
+  // ── DERNIÈRE SESSION ─────────────────────────────────────
   const lastSession = await prisma.session.findFirst({
     where: { status: 'ended' },
     orderBy: { createdAt: 'desc' },
     include: { appels: { select: { resultat: true, aPitche: true, rdvPris: true } } },
   })
-
   const lastSessionStats = lastSession ? {
     date: lastSession.createdAt,
     totalAppels: lastSession.totalAppels,
     interesses: lastSession.appels.filter(a => a.resultat === 'interesse').length,
+    pasInteresses: lastSession.appels.filter(a => a.resultat === 'pas_interesse').length,
     rdvs: lastSession.appels.filter(a => a.rdvPris).length,
+    pitches: lastSession.appels.filter(a => a.aPitche).length,
     duree: lastSession.duree,
+    resume: lastSession.resume,
   } : null
 
   return NextResponse.json({
-    today,
+    today: { ...today, compteur: dayStats.totalAppels },
     streak,
     objectifMin: OBJECTIF_MIN,
     semaineJours,
-    week: { totalAppels, joursActifs, moyenneJour, pitches: pitchesWeek, interesses: interessesWeek, rdvs: rdvsWeek },
+    day: dayStats,
+    week: { ...weekStats, joursActifs, moyenneJour },
+    month: { ...monthStats, moyenneJour: moyenneJourMois, joursAvecAppels: joursAvecAppelsMois },
     lastSession: lastSessionStats,
   })
 }

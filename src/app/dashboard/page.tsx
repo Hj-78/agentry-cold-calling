@@ -17,21 +17,28 @@ interface JourSemaine {
   isToday: boolean
 }
 
-interface WeekStats {
+interface PeriodStats {
   totalAppels: number
-  joursActifs: number
-  moyenneJour: number
-  pitches: number
   interesses: number
+  pasInteresses: number
   rdvs: number
+  pitches: number
+  rappeler: number
+  messagerie: number
+  joursActifs?: number
+  moyenneJour?: number
+  joursAvecAppels?: number
 }
 
 interface LastSessionStats {
   date: string
   totalAppels: number
   interesses: number
+  pasInteresses: number
   rdvs: number
+  pitches: number
   duree: number
+  resume: string | null
 }
 
 interface VilleStat {
@@ -57,7 +64,9 @@ interface DashboardData {
   streak: number
   objectifMin: number
   semaineJours: JourSemaine[]
-  week: WeekStats
+  day: PeriodStats
+  week: PeriodStats
+  month: PeriodStats
   lastSession: LastSessionStats | null
 }
 
@@ -80,6 +89,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [villesData, setVillesData] = useState<VilleStat[]>([])
   const [heuresData, setHeuresData] = useState<{ heures: HeureStat[]; meilleureHeure: HeureStat | null }>({ heures: [], meilleureHeure: null })
+  const [periodeActive, setPeriodeActive] = useState<'jour' | 'semaine' | 'mois'>('semaine')
 
   const fetchData = useCallback(async () => {
     const [dashRes, villesRes, heuresRes] = await Promise.all([
@@ -101,14 +111,14 @@ export default function DashboardPage() {
     </div>
   )
 
-  const { today, streak, objectifMin, semaineJours, week, lastSession } = data
+  const { today, streak, objectifMin, semaineJours, day, week, month, lastSession } = data
   const { heures, meilleureHeure } = heuresData
   const maxHeureAppels = heures.length > 0 ? Math.max(...heures.map(h => h.appels)) : 1
   const pct = Math.min(100, Math.round((today.compteur / objectifMin) * 100))
   const done = today.compteur >= objectifMin
   const surplus = today.compteur > objectifMin ? today.compteur - objectifMin : 0
-
   const dateLabel = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const statsActives = periodeActive === 'jour' ? day : periodeActive === 'semaine' ? week : month
 
   return (
     <div className="max-w-lg mx-auto px-5 py-8 md:py-12 space-y-4">
@@ -181,129 +191,131 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Semaine — points jours */}
-      {semaineJours.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-4">Cette semaine</div>
-          <div className="flex items-end justify-between gap-2">
+      {/* ── RÉCAPITULATIF JOUR / SEMAINE / MOIS ── */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        {/* Onglets */}
+        <div className="flex gap-1 mb-5 bg-slate-800 rounded-xl p-1">
+          {(['jour', 'semaine', 'mois'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriodeActive(p)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition capitalize ${
+                periodeActive === p
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {p === 'jour' ? 'Aujourd\'hui' : p === 'semaine' ? '7 jours' : '30 jours'}
+            </button>
+          ))}
+        </div>
+
+        {/* Barres de la semaine (seulement en vue semaine) */}
+        {periodeActive === 'semaine' && semaineJours.length > 0 && (
+          <div className="flex items-end justify-between gap-2 mb-5">
             {semaineJours.map((jour) => {
               const dayOfWeek = new Date(jour.date + 'T12:00:00').getDay()
               const label = JOURS_LABELS[dayOfWeek] || '?'
               const isFuture = !jour.isToday && new Date(jour.date + 'T23:59:59') > new Date()
               const fillPct = jour.compteur > 0 ? Math.min(100, Math.round((jour.compteur / objectifMin) * 100)) : 0
-              const barColor = jour.objectifAtteint
-                ? 'bg-green-500'
-                : jour.isToday && jour.compteur > 0
-                  ? 'bg-indigo-500'
-                  : 'bg-slate-600'
-
+              const barColor = jour.objectifAtteint ? 'bg-green-500' : jour.isToday && jour.compteur > 0 ? 'bg-indigo-500' : 'bg-slate-600'
               return (
                 <div key={jour.date} className="flex flex-col items-center gap-1.5 flex-1">
-                  {/* Compteur au-dessus */}
                   <span className={`text-xs tabular-nums h-4 ${jour.compteur > 0 ? (jour.objectifAtteint ? 'text-green-400' : 'text-slate-400') : 'text-transparent'}`}>
-                    {jour.compteur > 0 ? jour.compteur : '0'}
+                    {jour.compteur || '0'}
                   </span>
-                  {/* Barre — remplissage depuis le bas */}
                   <div className="w-full relative bg-slate-800 rounded-lg overflow-hidden" style={{ height: '48px' }}>
                     {!isFuture && fillPct > 0 && (
-                      <div
-                        className={`absolute bottom-0 left-0 right-0 rounded-lg transition-all duration-700 ${barColor}`}
-                        style={{ height: `${fillPct}%` }}
-                      />
+                      <div className={`absolute bottom-0 left-0 right-0 rounded-lg transition-all duration-700 ${barColor}`} style={{ height: `${fillPct}%` }} />
                     )}
-                    {jour.isToday && (
-                      <div className="absolute inset-0 border-2 border-indigo-500/50 rounded-lg" />
-                    )}
+                    {jour.isToday && <div className="absolute inset-0 border-2 border-indigo-500/50 rounded-lg" />}
                   </div>
-                  {/* Label jour */}
-                  <span className={`text-xs font-semibold ${jour.isToday ? 'text-indigo-400' : 'text-slate-500'}`}>
-                    {label}
-                  </span>
-                  {/* Pastille statut */}
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    jour.objectifAtteint ? 'bg-green-500' :
-                    jour.isToday ? 'bg-indigo-400' :
-                    isFuture ? 'bg-slate-700' : 'bg-red-700'
-                  }`} />
+                  <span className={`text-xs font-semibold ${jour.isToday ? 'text-indigo-400' : 'text-slate-500'}`}>{label}</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${jour.objectifAtteint ? 'bg-green-500' : jour.isToday ? 'bg-indigo-400' : isFuture ? 'bg-slate-700' : 'bg-red-700'}`} />
                 </div>
               )
             })}
           </div>
-          <div className="mt-3 flex items-center gap-4 pt-3 border-t border-slate-800">
-            <div className="text-center flex-1">
-              <div className="text-white font-bold text-lg">{week.totalAppels}</div>
-              <div className="text-slate-500 text-xs">appels</div>
+        )}
+
+        {/* Grille de stats */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {[
+            { label: 'Appels', val: statsActives.totalAppels, color: 'text-white', emoji: '📞' },
+            { label: 'Intéressés', val: statsActives.interesses, color: 'text-green-400', emoji: '✅' },
+            { label: 'Pas intéressés', val: statsActives.pasInteresses, color: 'text-red-400', emoji: '❌' },
+            { label: 'RDV pris', val: statsActives.rdvs, color: 'text-yellow-400', emoji: '📅' },
+            { label: 'Pitchés', val: statsActives.pitches, color: 'text-purple-400', emoji: '🎤' },
+            { label: 'À rappeler', val: statsActives.rappeler, color: 'text-amber-400', emoji: '🔄' },
+            { label: 'Messagerie', val: statsActives.messagerie, color: 'text-slate-400', emoji: '📵' },
+            {
+              label: periodeActive === 'mois' ? 'Moy/jour (mois)' : 'Moy/jour',
+              val: statsActives.moyenneJour ?? 0,
+              color: 'text-indigo-400',
+              emoji: '📊',
+            },
+          ].map(item => (
+            <div key={item.label} className="bg-slate-800/60 rounded-xl p-3 flex items-center gap-3">
+              <span className="text-base">{item.emoji}</span>
+              <div>
+                <div className={`text-xl font-bold tabular-nums ${item.color}`}>{item.val}</div>
+                <div className="text-slate-500 text-xs leading-tight">{item.label}</div>
+              </div>
             </div>
-            <div className="text-center flex-1">
-              <div className="text-green-400 font-bold text-lg">{week.interesses}</div>
-              <div className="text-slate-500 text-xs">intéressés</div>
-            </div>
-            <div className="text-center flex-1">
-              <div className="text-yellow-400 font-bold text-lg">{week.rdvs}</div>
-              <div className="text-slate-500 text-xs">RDV</div>
-            </div>
-            <div className="text-center flex-1">
-              <div className="text-amber-400 font-bold text-lg">{week.moyenneJour}</div>
-              <div className="text-slate-500 text-xs">moy/jour</div>
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+
+        {/* Entonnoir */}
+        {statsActives.totalAppels > 0 && (
+          <div className="pt-4 border-t border-slate-800 space-y-2">
+            <div className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3">Entonnoir</div>
+            {[
+              { label: 'Appels', val: statsActives.totalAppels, color: 'bg-indigo-500' },
+              { label: 'Pitchés', val: statsActives.pitches, color: 'bg-purple-500' },
+              { label: 'Intéressés', val: statsActives.interesses, color: 'bg-green-500' },
+              { label: 'RDV 📅', val: statsActives.rdvs, color: 'bg-yellow-500' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-3">
+                <div className="text-slate-500 text-xs w-20 flex-shrink-0">{item.label}</div>
+                <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className={`h-1.5 ${item.color} rounded-full`}
+                    style={{ width: `${statsActives.totalAppels > 0 ? Math.round((item.val / statsActives.totalAppels) * 100) : 0}%` }} />
+                </div>
+                <div className="text-white font-bold text-xs w-6 text-right">{item.val}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Dernière session */}
       {lastSession && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-3">Dernière session</div>
-          <div className="flex items-center justify-between">
-            <div className="text-slate-500 text-xs mb-3">{formatDateCourte(lastSession.date)}{lastSession.duree ? ` · ${formatDuree(lastSession.duree)}` : ''}</div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-slate-400 text-xs font-semibold uppercase tracking-widest">Dernière session</div>
+            <div className="text-slate-500 text-xs">{formatDateCourte(lastSession.date)}{lastSession.duree ? ` · ${formatDuree(lastSession.duree)}` : ''}</div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm">📞</span>
-              <span className="text-white font-bold">{lastSession.totalAppels}</span>
-              <span className="text-slate-500 text-xs">appels</span>
-            </div>
-            <div className="w-px h-4 bg-slate-700" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm">✅</span>
-              <span className="text-green-400 font-bold">{lastSession.interesses}</span>
-              <span className="text-slate-500 text-xs">intéressés</span>
-            </div>
-            <div className="w-px h-4 bg-slate-700" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm">📅</span>
-              <span className="text-yellow-400 font-bold">{lastSession.rdvs}</span>
-              <span className="text-slate-500 text-xs">RDV</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Entonnoir semaine */}
-      {week.totalAppels > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-4">📊 Entonnoir semaine</div>
-          <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2 mt-3">
             {[
-              { label: 'Appels', val: week.totalAppels, max: week.totalAppels, color: 'bg-indigo-500' },
-              { label: 'Pitchés', val: week.pitches, max: week.totalAppels, color: 'bg-purple-500' },
-              { label: 'Intéressés', val: week.interesses, max: week.totalAppels, color: 'bg-green-500' },
-              { label: 'RDV 📅', val: week.rdvs, max: week.totalAppels, color: 'bg-yellow-500' },
+              { emoji: '📞', val: lastSession.totalAppels, label: 'appels', color: 'text-white' },
+              { emoji: '🎤', val: lastSession.pitches, label: 'pitchés', color: 'text-purple-400' },
+              { emoji: '✅', val: lastSession.interesses, label: 'intéressés', color: 'text-green-400' },
+              { emoji: '❌', val: lastSession.pasInteresses, label: 'refus', color: 'text-red-400' },
+              { emoji: '📅', val: lastSession.rdvs, label: 'RDV', color: 'text-yellow-400' },
             ].map(item => (
-              <div key={item.label} className="flex items-center gap-3">
-                <div className="text-slate-500 text-xs w-20 flex-shrink-0">{item.label}</div>
-                <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-2 ${item.color} rounded-full transition-all`}
-                    style={{ width: `${item.max > 0 ? Math.round((item.val / item.max) * 100) : 0}%` }}
-                  />
-                </div>
-                <div className="text-white font-bold text-sm w-6 text-right">{item.val}</div>
+              <div key={item.label} className="bg-slate-800/60 rounded-xl p-2.5 text-center">
+                <div className="text-sm mb-0.5">{item.emoji}</div>
+                <div className={`text-lg font-bold ${item.color}`}>{item.val}</div>
+                <div className="text-slate-600 text-xs">{item.label}</div>
               </div>
             ))}
           </div>
+          {lastSession.resume && (
+            <p className="text-slate-500 text-xs mt-3 leading-relaxed line-clamp-2">{lastSession.resume}</p>
+          )}
         </div>
       )}
+
 
       {/* Meilleure heure d'appel */}
       {heures.length >= 3 && (
