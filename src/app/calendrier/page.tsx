@@ -97,13 +97,13 @@ export default function CalendrierPage() {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().substring(0, 10)
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10 md:py-14">
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-14">
 
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <p className="text-slate-500 text-base mb-1">{events.length} rendez-vous à venir</p>
-          <h1 className="text-3xl font-bold text-white">Calendrier</h1>
+          <p className="text-slate-500 text-sm mb-0.5">{events.length} rendez-vous à venir</p>
+          <h1 className="text-2xl font-bold text-white">Calendrier</h1>
         </div>
         {connected && (
           <button
@@ -127,15 +127,15 @@ export default function CalendrierPage() {
         </div>
       ) : !connected ? (
         /* Non connecté */
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center">
-          <div className="text-5xl mb-4">🍎</div>
-          <h2 className="text-white font-bold text-xl mb-3">Connecter iCloud Calendar</h2>
-          <p className="text-slate-500 text-sm mb-8 max-w-xs mx-auto leading-relaxed">
-            Configure ton Apple ID et ton mot de passe d&apos;application pour synchroniser tes RDV avec iCloud Calendar.
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-10 text-center">
+          <div className="text-4xl mb-3">🍎</div>
+          <h2 className="text-white font-bold text-lg mb-2">Connecter iCloud Calendar</h2>
+          <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto leading-relaxed">
+            Configure ton Apple ID et ton mot de passe d&apos;application pour synchroniser tes RDV.
           </p>
           <Link
             href="/parametres"
-            className="inline-block bg-white hover:bg-slate-100 text-slate-900 font-semibold px-6 py-3 rounded-xl transition"
+            className="inline-block bg-white hover:bg-slate-100 text-slate-900 font-semibold px-6 py-3 rounded-xl transition w-full md:w-auto"
           >
             <span className="mr-2">⚙️</span>
             Configurer dans les paramètres
@@ -149,10 +149,10 @@ export default function CalendrierPage() {
         </div>
       ) : events.length === 0 ? (
         /* Connecté mais aucun RDV */
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center">
-          <div className="text-5xl mb-4">🗓️</div>
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-10 text-center">
+          <div className="text-4xl mb-3">🗓️</div>
           <h2 className="text-white font-semibold text-lg mb-2">Aucun rendez-vous à venir</h2>
-          <p className="text-slate-500 text-sm mb-6">Les RDV pris en session apparaîtront ici automatiquement.</p>
+          <p className="text-slate-500 text-sm mb-5">Les RDV pris en session apparaîtront ici automatiquement.</p>
           <button
             onClick={() => setShowNewRdv(true)}
             className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition"
