@@ -27,19 +27,19 @@ export async function POST(req: Request) {
   })
 
   const objectif = body.objectif || 50
-  const villeFiltre: string | null = body.ville || null
+  const villesFiltre: string[] | null = Array.isArray(body.villes) && body.villes.length > 0 ? body.villes : null
 
   // Construire le filtre
   const where: Record<string, unknown> = { statut: 'nouveau', telephone: { not: null } }
-  if (villeFiltre) where.ville = villeFiltre
+  if (villesFiltre) where.ville = { in: villesFiltre }
 
-  // Récupérer les agences — si ville spécifique : ordre alphabétique nom
+  // Récupérer les agences — si villes spécifiques : ordre alphabétique nom
   // Si toutes les villes : on récupère toutes puis on trie par taille de ville (grandes d'abord)
   let agencesAAppeler
-  if (villeFiltre) {
+  if (villesFiltre) {
     agencesAAppeler = await prisma.agence.findMany({
       where,
-      orderBy: { nom: 'asc' },
+      orderBy: [{ ville: 'asc' }, { nom: 'asc' }],
       take: objectif,
       select: { id: true, nom: true, telephone: true, email: true, ville: true, adresse: true },
     })

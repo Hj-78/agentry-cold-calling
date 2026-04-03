@@ -72,7 +72,14 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const id = parseInt(searchParams.get('id') || '0')
-  await prisma.agence.delete({ where: { id } })
+  const id = searchParams.get('id')
+  const ville = searchParams.get('ville')
+
+  if (ville) {
+    const { count } = await prisma.agence.deleteMany({ where: { ville } })
+    return NextResponse.json({ ok: true, deleted: count })
+  }
+
+  await prisma.agence.delete({ where: { id: parseInt(id || '0') } })
   return NextResponse.json({ ok: true })
 }

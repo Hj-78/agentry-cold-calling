@@ -37,7 +37,9 @@ export default function SessionsPage() {
   const [objectif, setObjectif] = useState(50)
   const [disponibles, setDisponibles] = useState<number | null>(null)
   const [villes, setVilles] = useState<CityCount[]>([])
-  const [villeChoisie, setVilleChoisie] = useState<string>('') // '' = toutes
+  const [villesChoisies, setVillesChoisies] = useState<string[]>([]) // [] = toutes
+  const [deletingVille, setDeletingVille] = useState<string | null>(null)
+  const [confirmDeleteVille, setConfirmDeleteVille] = useState<string | null>(null)
   const OBJECTIF_MIN = 10
 
   const fetchData = async () => {
@@ -60,16 +62,24 @@ export default function SessionsPage() {
 
   useEffect(() => { fetchData() }, [])
 
-  // Quand on choisit une ville, mettre à jour l'objectif au count de cette ville
+  // Quand on choisit des villes, mettre à jour l'objectif au total des counts
   useEffect(() => {
-    if (villeChoisie) {
-      const v = villes.find(v => v.ville === villeChoisie)
-      if (v) setObjectif(v.count)
+    if (villesChoisies.length > 0) {
+      const total = villes
+        .filter(v => v.ville && villesChoisies.includes(v.ville))
+        .reduce((sum, v) => sum + v.count, 0)
+      setObjectif(total || 1)
     }
-  }, [villeChoisie, villes])
+  }, [villesChoisies, villes])
 
-  const dispoCette = villeChoisie
-    ? (villes.find(v => v.ville === villeChoisie)?.count ?? 0)
+  const toggleVille = (ville: string) => {
+    setVillesChoisies(prev =>
+      prev.includes(ville) ? prev.filter(v => v !== ville) : [...prev, ville]
+    )
+  }
+
+  const dispoTotal = villesChoisies.length > 0
+    ? villes.filter(v => v.ville && villesChoisies.includes(v.ville)).reduce((s, v) => s + v.count, 0)
     : (disponibles ?? 0)
 
   const launchSession = async () => {
@@ -77,7 +87,7 @@ export default function SessionsPage() {
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ objectif, ville: villeChoisie || null }),
+      body: JSON.stringify({ objectif, villes: villesChoisies.length > 0 ? villesChoisies : null }),
     })
     const session = await res.json()
     if (!session.agenceQueue || session.agenceQueue.length === 0) {
@@ -87,6 +97,15 @@ export default function SessionsPage() {
     }
     setActiveSession(session)
     setLaunching(false)
+  }
+
+  const deleteVille = async (ville: string) => {
+    setDeletingVille(ville)
+    await fetch(`/api/agences?ville=${encodeURIComponent(ville)}`, { method: 'DELETE' })
+    setConfirmDeleteVille(null)
+    setDeletingVille(null)
+    setVillesChoisies(prev => prev.filter(v => v !== ville))
+    await fetchData()
   }
 
   const handleSessionEnd = (endedSession: Session) => {
@@ -136,15 +155,25 @@ export default function SessionsPage() {
         <h2 className="text-white font-semibold text-xl mb-1">Lancer une session</h2>
         <p className="text-slate-500 text-sm mb-6">Transcription automatique · Analyse IA · Résumé de fin de session</p>
 
-        {/* Sélecteur de ville */}
+        {/* Sélecteur de villes (multi-select) */}
         {villes.length > 0 && (
           <div className="mb-6">
-            <label className="text-slate-400 text-sm block mb-3">📍 Ville à appeler</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-slate-400 text-sm">📍 Villes à appeler</label>
+              {villesChoisies.length > 0 && (
+                <button
+                  onClick={() => { setVillesChoisies([]); setObjectif(Math.min(disponibles ?? 50, 50)) }}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition"
+                >
+                  Tout déselectionner
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => { setVilleChoisie(''); setObjectif(Math.min(disponibles ?? 50, 50)) }}
+                onClick={() => { setVillesChoisies([]); setObjectif(Math.min(disponibles ?? 50, 50)) }}
                 className={`py-3 px-4 rounded-xl text-sm font-semibold transition border ${
-                  villeChoisie === ''
+                  villesChoisies.length === 0
                     ? 'bg-indigo-600 border-indigo-500 text-white'
                     : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
                 }`}
@@ -152,21 +181,46 @@ export default function SessionsPage() {
                 <div>🌍 Toutes les villes</div>
                 <div className="text-xs font-normal opacity-70 mt-0.5">{disponibles ?? '…'} agences</div>
               </button>
-              {villes.map(v => (
-                <button
-                  key={v.ville}
-                  onClick={() => setVilleChoisie(v.ville ?? '')}
-                  className={`py-3 px-4 rounded-xl text-sm font-semibold transition border text-left ${
-                    villeChoisie === v.ville
-                      ? 'bg-indigo-600 border-indigo-500 text-white'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
-                  }`}
-                >
-                  <div className="truncate">{v.ville?.replace(/^\d{5}\s/, '') ?? '—'}</div>
-                  <div className="text-xs font-normal opacity-70 mt-0.5">{v.count} agence{v.count > 1 ? 's' : ''}</div>
-                </button>
-              ))}
+              {villes.map(v => {
+                const selected = v.ville ? villesChoisies.includes(v.ville) : false
+                return (
+                  <div key={v.ville} className="relative group">
+                    <button
+                      onClick={() => v.ville && toggleVille(v.ville)}
+                      className={`w-full py-3 pl-4 pr-10 rounded-xl text-sm font-semibold transition border text-left ${
+                        selected
+                          ? 'bg-indigo-600 border-indigo-500 text-white'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {selected && <span className="text-indigo-200 text-xs">✓</span>}
+                        <span className="truncate">{v.ville?.replace(/^\d{5}\s/, '') ?? '—'}</span>
+                      </div>
+                      <div className="text-xs font-normal opacity-70 mt-0.5">{v.count} agence{v.count > 1 ? 's' : ''}</div>
+                    </button>
+                    {/* Bouton supprimer */}
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteVille(v.ville ?? '') }}
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-slate-600 hover:text-red-400 p-1 rounded"
+                      title="Supprimer toutes les agences de cette ville"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                )
+              })}
             </div>
+            {villesChoisies.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {villesChoisies.map(v => (
+                  <span key={v} className="bg-indigo-900/50 border border-indigo-700/50 text-indigo-300 text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                    {v.replace(/^\d{5}\s/, '')}
+                    <button onClick={() => toggleVille(v)} className="text-indigo-400 hover:text-white ml-0.5">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -186,28 +240,55 @@ export default function SessionsPage() {
               <span className="text-slate-500 text-base">appels</span>
             </div>
           </div>
-          {villeChoisie && (
+          {villesChoisies.length > 0 && (
             <div className="flex-1 bg-indigo-900/30 border border-indigo-700/40 rounded-xl px-4 py-3">
-              <div className="text-indigo-300 text-xs font-semibold mb-0.5">Ville sélectionnée</div>
-              <div className="text-white font-bold text-sm">{villeChoisie.replace(/^\d{5}\s/, '')}</div>
-              <div className="text-indigo-400 text-xs">{dispoCette} agences dispo</div>
+              <div className="text-indigo-300 text-xs font-semibold mb-0.5">{villesChoisies.length} ville{villesChoisies.length > 1 ? 's' : ''} sélectionnée{villesChoisies.length > 1 ? 's' : ''}</div>
+              <div className="text-indigo-400 text-xs">{dispoTotal} agences dispo</div>
             </div>
           )}
         </div>
 
-        {dispoCette === 0 && (
+        {dispoTotal === 0 && (
           <div className="mb-4 bg-amber-950/60 border border-amber-700/50 rounded-xl px-4 py-3 text-amber-300 text-sm">
-            ⚠️ {villeChoisie ? 'Toutes les agences de cette ville ont été appelées.' : 'Aucune agence disponible.'}
+            ⚠️ {villesChoisies.length > 0 ? 'Toutes les agences de ces villes ont été appelées.' : 'Aucune agence disponible.'}
           </div>
         )}
 
         <button
           onClick={launchSession}
-          disabled={launching || dispoCette === 0}
+          disabled={launching || dispoTotal === 0}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50"
         >
-          {launching ? 'Démarrage…' : villeChoisie ? `▶ Lancer — ${villeChoisie.replace(/^\d{5}\s/, '')}` : '▶ Lancer la session'}
+          {launching ? 'Démarrage…' : villesChoisies.length > 0 ? `▶ Lancer — ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : '▶ Lancer la session'}
         </button>
+
+        {/* Modal confirmation suppression ville */}
+        {confirmDeleteVille && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full">
+              <div className="text-2xl mb-3">🗑️</div>
+              <h3 className="text-white font-bold text-lg mb-2">Supprimer la ville ?</h3>
+              <p className="text-slate-400 text-sm mb-5">
+                Toutes les agences de <span className="text-white font-semibold">{confirmDeleteVille.replace(/^\d{5}\s/, '')}</span> seront définitivement supprimées.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmDeleteVille(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white transition text-sm font-medium"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => deleteVille(confirmDeleteVille)}
+                  disabled={deletingVille === confirmDeleteVille}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold transition disabled:opacity-50"
+                >
+                  {deletingVille === confirmDeleteVille ? 'Suppression…' : 'Supprimer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Historique */}
