@@ -24,6 +24,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^18",
     "react-dom": "^18",
+    "resend": "^6.10.0",
     "tsdav": "^2.1.8"
   },
   "overrides": {
