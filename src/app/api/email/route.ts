@@ -29,19 +29,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'SMTP non configuré. Configure ton email dans Paramètres.' }, { status: 400 })
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
-    auth: { user: smtpUser, pass: smtpPass },
-  })
+  // Use Gmail service shorthand when host is Gmail (handles TLS correctly on Railway)
+  const transportConfig = smtpHost === 'smtp.gmail.com'
+    ? { service: 'gmail', auth: { user: smtpUser, pass: smtpPass } }
+    : { host: smtpHost, port: smtpPort, secure: smtpPort === 465, auth: { user: smtpUser, pass: smtpPass } }
 
-  await transporter.sendMail({
-    from: `Hugo - Agentry <${smtpFrom}>`,
-    to,
-    subject,
-    html,
-  })
+  const transporter = nodemailer.createTransport(transportConfig)
+
+  try {
+    await transporter.sendMail({
+      from: smtpFrom.includes('<') ? smtpFrom : `Hugo - Agentry <${smtpFrom}>`,
+      to,
+      subject,
+      html,
+    })
+  } catch (err) {
+    console.error('Email send error:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }
