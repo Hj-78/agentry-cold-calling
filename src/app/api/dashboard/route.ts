@@ -126,9 +126,9 @@ export async function GET() {
   }
 
   // Moyenne par jour actif cette semaine
-  const joursAvecAppels = [...new Set(
+  const joursAvecAppels = Array.from(new Set(
     weekAppels.map(a => a.createdAt.toISOString().split('T')[0])
-  )].length
+  )).length
   const moyenneJour = joursAvecAppels > 0 ? Math.round(weekStats.totalAppels / joursAvecAppels) : 0
   const joursActifs = weekData.filter(d => d.compteur >= OBJECTIF_MIN && isJourActif(d.date)).length
 
@@ -139,9 +139,9 @@ export async function GET() {
     select: { resultat: true, aPitche: true, rdvPris: true, createdAt: true },
   })
   const monthStats = calcStats(monthAppels)
-  const joursAvecAppelsMois = [...new Set(
+  const joursAvecAppelsMois = Array.from(new Set(
     monthAppels.map(a => a.createdAt.toISOString().split('T')[0])
-  )].length
+  )).length
   const moyenneJourMois = joursAvecAppelsMois > 0 ? Math.round(monthStats.totalAppels / joursAvecAppelsMois) : 0
 
   // ── DERNIÈRE SESSION ─────────────────────────────────────
