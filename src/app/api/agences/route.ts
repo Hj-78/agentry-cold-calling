@@ -1,6 +1,14 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { writeFullBackup } from '@/lib/backup'
+
+// Backup différé (pas bloquant, 5s après la modification)
+let backupTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleBackup() {
+  if (backupTimer) clearTimeout(backupTimer)
+  backupTimer = setTimeout(() => { writeFullBackup().catch(() => {}) }, 5000)
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -67,6 +75,8 @@ export async function PATCH(req: Request) {
     where: { id },
     data,
   })
+  // Backup différé après chaque qualification/modification
+  scheduleBackup()
   return NextResponse.json(agence)
 }
 
@@ -77,9 +87,11 @@ export async function DELETE(req: NextRequest) {
 
   if (ville) {
     const { count } = await prisma.agence.deleteMany({ where: { ville } })
+    scheduleBackup()
     return NextResponse.json({ ok: true, deleted: count })
   }
 
   await prisma.agence.delete({ where: { id: parseInt(id || '0') } })
+  scheduleBackup()
   return NextResponse.json({ ok: true })
 }
