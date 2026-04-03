@@ -8,7 +8,7 @@ export default function MainWrapper({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const isStandalone = NO_NAV_PATHS.some(p => pathname.startsWith(p))
   return (
-    <main className={`flex-1 ${isStandalone ? '' : 'md:ml-64 pb-24 md:pb-0'}`}>
+    <main className={`flex-1 ${isStandalone ? '' : 'md:ml-64 pb-20 md:pb-0'}`}>
       {children}
     </main>
   )

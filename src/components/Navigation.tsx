@@ -3,9 +3,20 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const tabs = [
+// Sidebar desktop : toutes les pages
+const desktopTabs = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/sessions', label: 'Sessions', icon: '▶' },
+  { href: '/agences', label: 'Agences', icon: '🏢' },
+  { href: '/rappels', label: 'Rappels', icon: '🔔' },
+  { href: '/calendrier', label: 'Calendrier', icon: '📅' },
+  { href: '/emails', label: 'Emails', icon: '✉️' },
+  { href: '/parametres', label: 'Paramètres', icon: '⚙️' },
+]
+
+// Bottom bar mobile : sans Sessions (sessions = /tel via QR code)
+const mobileTabs = [
+  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/agences', label: 'Agences', icon: '🏢' },
   { href: '/rappels', label: 'Rappels', icon: '🔔' },
   { href: '/calendrier', label: 'Calendrier', icon: '📅' },
@@ -25,7 +36,7 @@ export default function Navigation() {
           <p className="text-sm text-slate-500 mt-1">Prospection pro</p>
         </div>
         <nav className="flex flex-col gap-1.5">
-          {tabs.map((tab) => (
+          {desktopTabs.map((tab) => (
             <Link
               key={tab.href}
               href={tab.href}
@@ -42,20 +53,27 @@ export default function Navigation() {
         </nav>
       </aside>
 
-      {/* Bottom bar mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-800 flex z-50 px-2 pb-safe">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={`flex-1 flex flex-col items-center py-3 gap-1 text-xs font-medium transition-colors ${
-              pathname === tab.href ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <span className="text-xl leading-none">{tab.icon}</span>
-            <span className="text-[10px]">{tab.label}</span>
-          </Link>
-        ))}
+      {/* Bottom bar mobile — 6 onglets, sans Sessions */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur border-t border-slate-800 flex z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {mobileTabs.map((tab) => {
+          const isActive = pathname === tab.href || (tab.href !== '/dashboard' && pathname.startsWith(tab.href))
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={`flex-1 flex flex-col items-center pt-3 pb-2 gap-0.5 transition-colors ${
+                isActive ? 'text-indigo-400' : 'text-slate-500 active:text-slate-300'
+              }`}
+            >
+              <span className={`text-[22px] leading-none transition-transform ${isActive ? 'scale-110' : ''}`}>
+                {tab.icon}
+              </span>
+              <span className={`text-[9px] font-semibold tracking-wide ${isActive ? 'text-indigo-400' : 'text-slate-600'}`}>
+                {tab.label.toUpperCase()}
+              </span>
+            </Link>
+          )
+        })}
       </nav>
     </>
   )
