@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import Anthropic from '@anthropic-ai/sdk'
 import nodemailer from 'nodemailer'
 import { DEFAULT_TEMPLATES } from '@/lib/email-templates'
+import { writeFullBackup, writeSessionReport } from '@/lib/backup'
 
 // PATCH: met à jour une session (ajoute un appel, ou clôture la session)
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -237,6 +238,10 @@ Génère un résumé de session motivant et concis en français (5-8 phrases max
         // On ne les marque pas, elles restent "nouveau" pour la prochaine session
       }
     } catch { /* silencieux */ }
+
+    // Auto-backup après chaque session : backup complet + rapport journalier
+    writeFullBackup().catch(() => {})
+    writeSessionReport(id).catch(() => {})
 
     return NextResponse.json({ ...updated, agenceQueue: session.agenceQueue ? JSON.parse(session.agenceQueue) : null })
   }
