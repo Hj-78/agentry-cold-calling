@@ -17,7 +17,6 @@ export async function POST(req: Request) {
   const cfg: Record<string, string> = {}
   params.forEach(p => { cfg[p.cle] = p.valeur })
 
-  const fromEmail = cfg.SMTP_FROM || cfg.SMTP_USER || process.env.GMAIL_USER || ''
   const resendKey = process.env.RESEND_API_KEY
 
   if (!resendKey) {
@@ -29,11 +28,8 @@ export async function POST(req: Request) {
 
   const resend = new Resend(resendKey)
 
-  // Resend requires a verified domain for the from address.
-  // If fromEmail is a Gmail address, we use their verified address format.
-  const fromAddress = fromEmail.includes('<')
-    ? fromEmail
-    : `Hugo - Agentry <${fromEmail}>`
+  // agentry.fr est vérifié dans Resend — toujours envoyer depuis ce domaine
+  const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@agentry.fr>'
 
   try {
     const { error } = await resend.emails.send({
