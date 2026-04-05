@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { Resend } from 'resend'
 import { DEFAULT_TEMPLATES } from '@/lib/email-templates'
 import { writeFullBackup, writeSessionReport } from '@/lib/backup'
+import { createRdvWithMeet } from '@/lib/google-calendar'
 
 // PATCH: met à jour une session (ajoute un appel, ou clôture la session)
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -99,32 +100,50 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           ].join('\r\n')
         })()
 
-        // 1. Créer l'événement iCloud Calendar
+        // 1. Créer l'événement Google Calendar avec Google Meet (invite envoyée par Google)
+        let meetLink = ''
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/calendar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              agenceNom: body.agenceNom,
-              agenceEmail: body.agenceEmail,
-              rdvDate: body.rdvDate,
-              rdvHeure: body.rdvHeure,
-              description: resumeAppel,
-            }),
+          const googleResult = await createRdvWithMeet({
+            agenceNom: body.agenceNom || '',
+            agenceEmail: body.agenceEmail,
+            rdvDate: body.rdvDate,
+            rdvHeure: body.rdvHeure,
+            description: resumeAppel,
           })
-        } catch { /* iCloud Calendar optionnel */ }
+          if (googleResult.meetLink) meetLink = googleResult.meetLink
+        } catch { /* Google Calendar optionnel */ }
+
+        // Fallback iCloud Calendar si Google Calendar non configuré
+        if (!meetLink) {
+          try {
+            await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/calendar`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agenceNom: body.agenceNom,
+                agenceEmail: body.agenceEmail,
+                rdvDate: body.rdvDate,
+                rdvHeure: body.rdvHeure,
+                description: resumeAppel,
+              }),
+            })
+          } catch { /* iCloud Calendar optionnel */ }
+        }
 
         // 2. Envoyer l'email de confirmation via Resend (toujours le template DEFAULT)
         if (resendKey) {
           const tmpl = DEFAULT_TEMPLATES.find(t => t.id === 'rdv-confirmation')!
           const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
+          const meetBlock = meetLink
+            ? `<div style="margin:20px 0;text-align:center"><a href="${meetLink}" style="display:inline-block;background:#1a73e8;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:15px;font-weight:600">🎥 Rejoindre Google Meet</a><p style="margin:8px 0 0;font-size:12px;color:#94a3b8">${meetLink}</p></div>`
+            : ''
           const vars: Record<string, string> = {
             agence: body.agenceNom || '',
             expediteur: 'Hugo — Agentry',
             rdvDate: rdvDateFr,
             rdvHeure: body.rdvHeure,
             resumeAppel,
-            meetLink: '',
+            meetLink: meetBlock,
           }
           const apply = (s: string) => Object.entries(vars).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), s)
           const sujet = apply(tmpl.sujet)
