@@ -64,6 +64,8 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [emailModalTo, setEmailModalTo] = useState('')
   const [emailModalSubject, setEmailModalSubject] = useState('')
   const [emailModalBody, setEmailModalBody] = useState('')
+  const [emailModalRdvDate, setEmailModalRdvDate] = useState('')
+  const [emailModalRdvHeure, setEmailModalRdvHeure] = useState('')
   const [emailModalSending, setEmailModalSending] = useState(false)
   const [emailModalSent, setEmailModalSent] = useState(false)
   const [emailModalError, setEmailModalError] = useState('')
@@ -164,10 +166,20 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   useEffect(() => {
     const t = emailModalTemplates.find(t => t.id === emailModalTemplateId)
     if (!t) return
-    const vars = { agence: currentAgence?.nom || '', expediteur }
+    const rdvDateFr = emailModalRdvDate
+      ? new Date(emailModalRdvDate + 'T12:00:00').toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        })
+      : ''
+    const vars = {
+      agence: currentAgence?.nom || '',
+      expediteur: 'Hugo — Agentry',
+      rdvDate: rdvDateFr,
+      rdvHeure: emailModalRdvHeure,
+    }
     setEmailModalSubject(applyVars(t.sujet, vars))
     setEmailModalBody(applyVars(t.corps, vars))
-  }, [emailModalTemplateId, emailModalTemplates, currentAgence?.nom, expediteur])
+  }, [emailModalTemplateId, emailModalTemplates, currentAgence?.nom, expediteur, emailModalRdvDate, emailModalRdvHeure])
 
   useEffect(() => {
     if (rdvPris && currentAgence) {
@@ -520,6 +532,8 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
               setEmailModalTemplateId('')
               setEmailModalSubject('')
               setEmailModalBody('')
+              setEmailModalRdvDate(rdvDate || '')
+              setEmailModalRdvHeure(rdvHeure || '')
               setEmailModalSent(false)
               setEmailModalError('')
               setShowEmailModal(true)
@@ -882,6 +896,34 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                         {t.objection && <div className="text-xs text-slate-500 mt-0.5">Objection : {t.objection}</div>}
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Champs date/heure RDV si template rdv-confirmation sélectionné */}
+              {emailModalTemplateId === 'rdv-confirmation' && (
+                <div className="bg-slate-800/60 border border-indigo-500/30 rounded-xl px-4 py-3 space-y-3">
+                  <p className="text-indigo-400 text-xs font-semibold">📅 Détails du rendez-vous</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 text-xs block mb-1">Date du RDV *</label>
+                      <input
+                        type="date"
+                        value={emailModalRdvDate}
+                        onChange={e => setEmailModalRdvDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 text-xs block mb-1">Heure *</label>
+                      <input
+                        type="time"
+                        value={emailModalRdvHeure}
+                        onChange={e => setEmailModalRdvHeure(e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
