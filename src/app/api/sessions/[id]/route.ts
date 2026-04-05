@@ -64,10 +64,40 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           } catch { /* résumé IA optionnel */ }
         }
 
-        // Formater la date du RDV en français
-        const rdvDateFr = new Date(body.rdvDate).toLocaleDateString('fr-FR', {
+        // Formater la date du RDV en français (T12:00:00 évite le bug UTC minuit → jour -1)
+        const rdvDateFr = new Date(body.rdvDate + 'T12:00:00').toLocaleDateString('fr-FR', {
           weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
         })
+
+        // Générer la pièce jointe .ics (invitation Google/Apple Calendar)
+        const icsContent = (() => {
+          const [y, m, d] = body.rdvDate.split('-')
+          const [hh, mm] = body.rdvHeure.split(':')
+          const startDt = `${y}${m}${d}T${hh}${mm}00`
+          const endHh = String(parseInt(hh) + 1).padStart(2, '0')
+          const endDt = `${y}${m}${d}T${endHh}${mm}00`
+          const uid = `${Date.now()}@agentry.fr`
+          const desc = resumeAppel.replace(/\n/g, '\\n').replace(/,/g, '\\,')
+          return [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Agentry//Agentry CRM//FR',
+            'CALSCALE:GREGORIAN',
+            'METHOD:REQUEST',
+            'BEGIN:VEVENT',
+            `DTSTART:${startDt}`,
+            `DTEND:${endDt}`,
+            `UID:${uid}`,
+            `SUMMARY:RDV Agentry - ${body.agenceNom || ''}`,
+            `DESCRIPTION:${desc}`,
+            `ORGANIZER;CN=Hugo - Agentry:mailto:hugo@contact.agentry.fr`,
+            `ATTENDEE;CN=${body.agenceNom || ''};RSVP=TRUE:mailto:${body.agenceEmail}`,
+            'STATUS:CONFIRMED',
+            'SEQUENCE:0',
+            'END:VEVENT',
+            'END:VCALENDAR',
+          ].join('\r\n')
+        })()
 
         // 1. Créer l'événement iCloud Calendar
         try {
@@ -83,39 +113,34 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }),
           })
         } catch { /* iCloud Calendar optionnel */ }
-        const meetLink = ''
 
-        // 2. Envoyer l'email de confirmation via Resend
+        // 2. Envoyer l'email de confirmation via Resend (toujours le template DEFAULT)
         if (resendKey) {
-          let templates = DEFAULT_TEMPLATES
-          const tmplParam = await prisma.parametre.findUnique({ where: { cle: 'EMAIL_TEMPLATES' } })
-          if (tmplParam) {
-            try { templates = JSON.parse(tmplParam.valeur) } catch { /* utiliser défaut */ }
+          const tmpl = DEFAULT_TEMPLATES.find(t => t.id === 'rdv-confirmation')!
+          const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
+          const vars: Record<string, string> = {
+            agence: body.agenceNom || '',
+            expediteur: 'Hugo — Agentry',
+            rdvDate: rdvDateFr,
+            rdvHeure: body.rdvHeure,
+            resumeAppel,
+            meetLink: '',
           }
+          const apply = (s: string) => Object.entries(vars).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), s)
+          const sujet = apply(tmpl.sujet)
+          const corps = apply(tmpl.corps)
 
-          const tmpl = templates.find(t => t.id === 'rdv-confirmation') || DEFAULT_TEMPLATES.find(t => t.id === 'rdv-confirmation')
-          if (tmpl) {
-            const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
-            const vars: Record<string, string> = {
-              agence: body.agenceNom || '',
-              expediteur: fromAddress,
-              rdvDate: rdvDateFr,
-              rdvHeure: body.rdvHeure,
-              resumeAppel,
-              meetLink: '',
-            }
-            const apply = (s: string) => Object.entries(vars).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), s)
-            const sujet = apply(tmpl.sujet)
-            const corps = apply(tmpl.corps)
-
-            const resend = new Resend(resendKey)
-            await resend.emails.send({
-              from: fromAddress,
-              to: body.agenceEmail,
-              subject: sujet,
-              html: corps,
-            })
-          }
+          const resend = new Resend(resendKey)
+          await resend.emails.send({
+            from: fromAddress,
+            to: body.agenceEmail,
+            subject: sujet,
+            html: corps,
+            attachments: [{
+              filename: 'rendez-vous-agentry.ics',
+              content: Buffer.from(icsContent).toString('base64'),
+            }],
+          })
         }
       } catch { /* auto-envoi optionnel, non bloquant */ }
     }
