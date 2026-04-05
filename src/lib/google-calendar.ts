@@ -7,7 +7,7 @@ export interface GoogleMeetResult {
 
 export async function createRdvWithMeet(params: {
   agenceNom: string
-  agenceEmail: string
+  agenceEmail?: string
   rdvDate: string   // YYYY-MM-DD
   rdvHeure: string  // HH:MM
   description: string
@@ -46,9 +46,9 @@ export async function createRdvWithMeet(params: {
         dateTime: `${params.rdvDate}T${String(parseInt(params.rdvHeure.split(':')[0]) + 1).padStart(2, '0')}:${params.rdvHeure.split(':')[1]}:00`,
         timeZone: 'Europe/Paris',
       },
-      attendees: [
-        { email: params.agenceEmail, displayName: params.agenceNom },
-      ],
+      attendees: params.agenceEmail
+        ? [{ email: params.agenceEmail, displayName: params.agenceNom }]
+        : [],
       conferenceData: {
         createRequest: {
           requestId: `agentry-rdv-${Date.now()}`,

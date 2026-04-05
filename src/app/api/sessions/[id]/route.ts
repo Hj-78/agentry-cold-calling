@@ -40,8 +40,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     })
 
-    // Auto-envoi email de confirmation de RDV + création iCloud Calendar
-    if (body.rdvPris && body.agenceEmail && body.rdvDate && body.rdvHeure) {
+    // Auto-envoi email de confirmation de RDV + création Google Calendar
+    if (body.rdvPris && body.rdvDate && body.rdvHeure) {
       try {
         const resendKey = process.env.RESEND_API_KEY
 
@@ -139,8 +139,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           } catch { /* iCloud Calendar optionnel */ }
         }
 
-        // 2. Envoyer l'email de confirmation via Resend (toujours le template DEFAULT)
-        if (resendKey) {
+        // 2. Envoyer l'email de confirmation via Resend (seulement si email prospect dispo)
+        if (resendKey && body.agenceEmail) {
           const tmpl = DEFAULT_TEMPLATES.find(t => t.id === 'rdv-confirmation')!
           const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
           const meetBlock = meetLink
