@@ -102,6 +102,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
         // 1. Créer l'événement Google Calendar avec Google Meet (invite envoyée par Google)
         let meetLink = ''
+        console.log('[GCAL] Tentative création événement Google Calendar pour', body.agenceEmail, body.rdvDate, body.rdvHeure)
+        console.log('[GCAL] Env vars présentes:', {
+          GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
+          GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
+          GOOGLE_REFRESH_TOKEN: !!process.env.GOOGLE_REFRESH_TOKEN,
+        })
         try {
           const googleResult = await createRdvWithMeet({
             agenceNom: body.agenceNom || '',
@@ -110,8 +116,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             rdvHeure: body.rdvHeure,
             description: resumeAppel,
           })
+          console.log('[GCAL] Résultat:', googleResult)
           if (googleResult.meetLink) meetLink = googleResult.meetLink
-        } catch { /* Google Calendar optionnel */ }
+        } catch (gcalErr) {
+          console.error('[GCAL] Erreur Google Calendar:', gcalErr)
+        }
 
         // Fallback iCloud Calendar si Google Calendar non configuré
         if (!meetLink) {

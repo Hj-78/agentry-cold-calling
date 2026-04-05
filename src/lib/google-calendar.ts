@@ -17,6 +17,7 @@ export async function createRdvWithMeet(params: {
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN
 
   if (!clientId || !clientSecret || !refreshToken) {
+    console.error('[GCAL] Variables manquantes:', { clientId: !!clientId, clientSecret: !!clientSecret, refreshToken: !!refreshToken })
     return { meetLink: null, eventLink: null }
   }
 
