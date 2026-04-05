@@ -262,6 +262,14 @@ Génère un résumé de session motivant et concis en français (5-8 phrases max
   return NextResponse.json({ error: 'Action inconnue' }, { status: 400 })
 }
 
+// DELETE: supprime une session et ses appels
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const id = parseInt(params.id)
+  await prisma.sessionAppel.deleteMany({ where: { sessionId: id } })
+  await prisma.session.delete({ where: { id } })
+  return NextResponse.json({ ok: true })
+}
+
 // GET: retourne une session par ID
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const id = parseInt(params.id)
