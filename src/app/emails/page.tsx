@@ -28,6 +28,8 @@ export default function EmailsPage() {
   const [to, setTo] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [rdvDate, setRdvDate] = useState('')
+  const [rdvHeure, setRdvHeure] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
@@ -67,13 +69,21 @@ export default function EmailsPage() {
   useEffect(() => {
     const t = templates.find(t => t.id === templateId)
     if (!t) return
+    const rdvDateFr = rdvDate
+      ? new Date(rdvDate + 'T12:00:00').toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        })
+      : '{{rdvDate}}'
     const vars = {
       agence: selectedAgence?.nom || '',
       expediteur,
+      rdvDate: rdvDateFr,
+      rdvHeure: rdvHeure || '{{rdvHeure}}',
+      resumeAppel: '',
     }
     setSubject(applyVars(t.sujet, vars))
     setBody(applyVars(t.corps, vars))
-  }, [templateId, agenceId, templates, expediteur, selectedAgence?.nom])
+  }, [templateId, agenceId, templates, expediteur, selectedAgence?.nom, rdvDate, rdvHeure])
 
   // When agency changes, auto-fill email
   useEffect(() => {
@@ -89,7 +99,17 @@ export default function EmailsPage() {
       const res = await fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, html: body }),
+        body: JSON.stringify({
+          to,
+          subject,
+          html: body,
+          ...(templateId === 'rdv-confirmation' && rdvDate && rdvHeure ? {
+            rdvDate,
+            rdvHeure,
+            agenceNom: selectedAgence?.nom || '',
+            agenceEmail: to,
+          } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Erreur envoi'); setSending(false); return }
@@ -254,6 +274,33 @@ export default function EmailsPage() {
               ))}
             </div>
           </div>
+
+          {/* Date/Heure RDV — affiché uniquement pour rdv-confirmation */}
+          {templateId === 'rdv-confirmation' && (
+            <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl px-5 py-4 space-y-3">
+              <p className="text-indigo-300 text-sm font-semibold">📅 Informations du rendez-vous</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 text-xs font-medium block mb-1.5">Date du RDV</label>
+                  <input
+                    type="date"
+                    value={rdvDate}
+                    onChange={e => setRdvDate(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs font-medium block mb-1.5">Heure du RDV</label>
+                  <input
+                    type="time"
+                    value={rdvHeure}
+                    onChange={e => setRdvHeure(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Destinataire */}
           <div>

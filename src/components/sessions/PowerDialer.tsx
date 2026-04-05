@@ -982,7 +982,17 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                     const res = await fetch('/api/email', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ to: emailModalTo, subject: emailModalSubject, html: emailModalBody }),
+                      body: JSON.stringify({
+                        to: emailModalTo,
+                        subject: emailModalSubject,
+                        html: emailModalBody,
+                        ...(emailModalTemplateId === 'rdv-confirmation' && emailModalRdvDate && emailModalRdvHeure ? {
+                          rdvDate: emailModalRdvDate,
+                          rdvHeure: emailModalRdvHeure,
+                          agenceNom: currentAgence?.nom || '',
+                          agenceEmail: emailModalTo,
+                        } : {}),
+                      }),
                     })
                     const data = await res.json()
                     if (!res.ok) { setEmailModalError(data.error || 'Erreur envoi') }
