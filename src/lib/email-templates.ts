@@ -40,28 +40,44 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
     id: 'rdv-confirmation',
     nom: '📅 Confirmation de rendez-vous (auto)',
     objection: 'Suite à un RDV pris',
-    sujet: '✅ Rendez-vous confirmé – {{agence}} – {{rdvDate}}',
-    corps: `<p>Bonjour,</p>
+    sujet: '✅ RDV confirmé — {{rdvDate}} à {{rdvHeure}}',
+    corps: `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;color:#0f172a">
 
-<p>Je vous confirme notre rendez-vous prévu le <strong>{{rdvDate}} à {{rdvHeure}}</strong> et je m'en réjouis.</p>
+<div style="background:linear-gradient(135deg,#6366f1 0%,#4f46e5 100%);border-radius:12px 12px 0 0;padding:32px 32px 24px;text-align:center">
+  <p style="margin:0;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#c7d2fe;font-weight:600">Confirmation</p>
+  <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;color:#ffffff">Rendez-vous confirmé ✅</h1>
+</div>
 
-<p>Pour vous rappeler le contexte de notre échange de ce jour :</p>
-<blockquote style="border-left:3px solid #6366f1;margin:16px 0;padding:12px 16px;background:#f8fafc;color:#475569;font-style:italic">
-  {{resumeAppel}}
-</blockquote>
+<div style="background:#ffffff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:32px">
 
-{{meetLink}}
+  <p style="margin:0 0 20px;font-size:15px;line-height:1.7">Bonjour,</p>
 
-<p>Lors de notre rendez-vous, nous aborderons concrètement :</p>
-<ul style="line-height:2.2;padding-left:20px">
-  <li>Votre activité actuelle et vos objectifs de développement sur {{agence}}</li>
-  <li>Comment nous générons des mandats exclusifs sur votre secteur</li>
-  <li>Des exemples chiffrés d'agences partenaires comparables à la vôtre</li>
-</ul>
+  <p style="margin:0 0 24px;font-size:15px;line-height:1.7">
+    Je vous confirme notre rendez-vous téléphonique prévu le
+    <strong style="color:#4f46e5">{{rdvDate}} à {{rdvHeure}}</strong>.
+    J'ai ajouté un rappel à cet email — vous trouverez l'invitation dans la pièce jointe pour l'ajouter directement à votre agenda.
+  </p>
 
-<p>Notre échange durera environ <strong>20 à 30 minutes</strong>. N'hésitez pas à me faire signe si vous avez des questions d'ici là ou si vous souhaitez modifier le créneau.</p>
+  <div style="background:#f8fafc;border-left:4px solid #6366f1;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 28px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6366f1">Contexte de notre échange</p>
+    <p style="margin:0;font-size:14px;line-height:1.7;color:#475569;font-style:italic">{{resumeAppel}}</p>
+  </div>
 
-<p>À très bientôt,</p>${SIGNATURE}`,
+  <p style="margin:0 0 12px;font-size:15px;line-height:1.7">Au programme de notre échange (<strong>15 à 20 min</strong>) :</p>
+  <ul style="margin:0 0 28px;padding-left:20px;line-height:2;font-size:15px;color:#334155">
+    <li>Votre activité actuelle et votre secteur de prospection</li>
+    <li>Notre approche de prospection vendeurs via <strong>LeBonCoin</strong> — comment on identifie et contacte les propriétaires qui vendent sans agence</li>
+    <li>Voir si un partenariat a du sens pour vous</li>
+  </ul>
+
+  <p style="margin:0 0 28px;font-size:15px;line-height:1.7">
+    N'hésitez pas à me contacter si vous souhaitez décaler le créneau ou avez des questions avant notre échange.
+  </p>
+
+  <p style="margin:0;font-size:15px">À très bientôt,</p>
+
+</div>
+</div>${SIGNATURE}`,
   },
   {
     id: 'suivi',
