@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import Anthropic from '@anthropic-ai/sdk'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { DEFAULT_TEMPLATES } from '@/lib/email-templates'
 import { writeFullBackup, writeSessionReport } from '@/lib/backup'
 
@@ -39,14 +39,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     })
 
-    // Auto-envoi email de confirmation de RDV + création Google Calendar
+    // Auto-envoi email de confirmation de RDV + création iCloud Calendar
     if (body.rdvPris && body.agenceEmail && body.rdvDate && body.rdvHeure) {
       try {
-        const smtpParams = await prisma.parametre.findMany({
-          where: { cle: { in: ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'GOOGLE_REFRESH_TOKEN'] } },
-        })
-        const smtp: Record<string, string> = {}
-        smtpParams.forEach(p => { smtp[p.cle] = p.valeur })
+        const resendKey = process.env.RESEND_API_KEY
 
         // Générer résumé IA pour l'email si transcription disponible
         let resumeAppel = body.noteRapide || 'Échange téléphonique – suite à notre conversation, vous avez confirmé votre intérêt pour un rendez-vous.'
@@ -89,8 +85,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         } catch { /* iCloud Calendar optionnel */ }
         const meetLink = ''
 
-        // 2. Envoyer l'email de confirmation avec le lien Meet
-        if (smtp.SMTP_HOST && smtp.SMTP_USER && smtp.SMTP_PASS) {
+        // 2. Envoyer l'email de confirmation via Resend
+        if (resendKey) {
           let templates = DEFAULT_TEMPLATES
           const tmplParam = await prisma.parametre.findUnique({ where: { cle: 'EMAIL_TEMPLATES' } })
           if (tmplParam) {
@@ -99,30 +95,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
           const tmpl = templates.find(t => t.id === 'rdv-confirmation') || DEFAULT_TEMPLATES.find(t => t.id === 'rdv-confirmation')
           if (tmpl) {
-            const expediteur = smtp.SMTP_FROM || smtp.SMTP_USER
+            const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@agentry.fr>'
             const vars: Record<string, string> = {
               agence: body.agenceNom || '',
-              expediteur,
+              expediteur: fromAddress,
               rdvDate: rdvDateFr,
               rdvHeure: body.rdvHeure,
               resumeAppel,
-              meetLink: meetLink
-                ? `<p style="margin:16px 0"><a href="${meetLink}" style="display:inline-block;background:#1a73e8;color:#fff;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none">🎥 Rejoindre le Google Meet</a><br><span style="color:#94a3b8;font-size:11px;margin-top:6px;display:block">${meetLink}</span></p>`
-                : '',
+              meetLink: '',
             }
             const apply = (s: string) => Object.entries(vars).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), s)
             const sujet = apply(tmpl.sujet)
             const corps = apply(tmpl.corps)
 
-            const transporter = nodemailer.createTransport({
-              host: smtp.SMTP_HOST,
-              port: parseInt(smtp.SMTP_PORT || '587'),
-              secure: parseInt(smtp.SMTP_PORT || '587') === 465,
-              auth: { user: smtp.SMTP_USER, pass: smtp.SMTP_PASS },
-            })
-
-            await transporter.sendMail({
-              from: `Agentry <${expediteur}>`,
+            const resend = new Resend(resendKey)
+            await resend.emails.send({
+              from: fromAddress,
               to: body.agenceEmail,
               subject: sujet,
               html: corps,

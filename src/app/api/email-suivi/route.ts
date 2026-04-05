@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import Anthropic from '@anthropic-ai/sdk'
 
 export async function POST(req: Request) {
@@ -12,18 +11,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email agence manquant' }, { status: 400 })
     }
 
-    // Récupère config SMTP
-    const params = await prisma.parametre.findMany({
-      where: { cle: { in: ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'ANTHROPIC_API_KEY'] } },
-    })
-    const cfg: Record<string, string> = {}
-    params.forEach(p => { cfg[p.cle] = p.valeur })
-
-    if (!cfg.SMTP_HOST || !cfg.SMTP_USER || !cfg.SMTP_PASS) {
-      return NextResponse.json({ error: 'SMTP non configuré dans Paramètres.' }, { status: 400 })
+    const resendKey = process.env.RESEND_API_KEY
+    if (!resendKey) {
+      return NextResponse.json({ error: 'RESEND_API_KEY non configuré.' }, { status: 500 })
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY || cfg.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY
 
     // Valeurs par défaut (fallback si Claude indisponible)
     let emailSubject = `Suite à notre échange — ${agenceNom}`
@@ -75,16 +68,11 @@ Réponds UNIQUEMENT avec un JSON valide :
       }
     }
 
-    // Envoie l'email
-    const transporter = nodemailer.createTransport({
-      host: cfg.SMTP_HOST,
-      port: parseInt(cfg.SMTP_PORT || '587'),
-      secure: cfg.SMTP_PORT === '465',
-      auth: { user: cfg.SMTP_USER, pass: cfg.SMTP_PASS },
-    })
-
-    await transporter.sendMail({
-      from: cfg.SMTP_FROM || cfg.SMTP_USER,
+    // Envoie l'email via Resend
+    const resend = new Resend(resendKey)
+    const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@agentry.fr>'
+    await resend.emails.send({
+      from: fromAddress,
       to: agenceEmail,
       subject: emailSubject,
       html: emailHtml,
