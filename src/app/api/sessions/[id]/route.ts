@@ -95,7 +95,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
           const tmpl = templates.find(t => t.id === 'rdv-confirmation') || DEFAULT_TEMPLATES.find(t => t.id === 'rdv-confirmation')
           if (tmpl) {
-            const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@agentry.fr>'
+            const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
             const vars: Record<string, string> = {
               agence: body.agenceNom || '',
               expediteur: fromAddress,

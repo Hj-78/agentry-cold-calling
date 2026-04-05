@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const resend = new Resend(resendKey)
 
   // agentry.fr est vérifié dans Resend — toujours envoyer depuis ce domaine
-  const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@agentry.fr>'
+  const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
 
   try {
     const { error } = await resend.emails.send({

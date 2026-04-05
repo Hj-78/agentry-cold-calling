@@ -70,7 +70,7 @@ Réponds UNIQUEMENT avec un JSON valide :
 
     // Envoie l'email via Resend
     const resend = new Resend(resendKey)
-    const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@agentry.fr>'
+    const fromAddress = process.env.SMTP_FROM || 'Hugo - Agentry <hugo@contact.agentry.fr>'
     await resend.emails.send({
       from: fromAddress,
       to: agenceEmail,
