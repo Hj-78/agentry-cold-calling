@@ -94,18 +94,22 @@ export default function EmailsPage() {
     fetch('/api/agences').then(r => r.json()).then((d: Agence[]) => setAgences(d))
     fetch('/api/email-templates').then(r => r.json()).then(setTemplates)
 
-    // Vérifier URL params (auth callback)
     const sp = new URLSearchParams(window.location.search)
-    if (sp.get('auth_success')) {
+    if (sp.get('auth_success') || sp.get('auth_error')) {
       window.history.replaceState({}, '', '/emails')
-      loadMessages('inbox')
-    } else if (sp.get('auth_error')) {
-      window.history.replaceState({}, '', '/emails')
-    } else {
-      loadMessages('inbox')
     }
+    loadMessages('inbox')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Auto-refresh inbox every 30s ─────────────────────────────────────────
+  useEffect(() => {
+    if (panel !== 'inbox') return
+    const interval = setInterval(() => {
+      loadMessages('inbox')
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [panel, loadMessages])
 
   // ── Load messages ────────────────────────────────────────────────────────
 
@@ -126,7 +130,8 @@ export default function EmailsPage() {
     setReplyMode(false)
     setReplyBody('')
     setReplySent(false)
-    const res = await fetch(`/api/gmail/${msg.id}`)
+    const folder = msg.folder || panel
+    const res = await fetch(`/api/gmail/${msg.id}?folder=${folder}`)
     if (res.ok) {
       const full = await res.json()
       setSelectedMsg(full)
@@ -204,24 +209,28 @@ export default function EmailsPage() {
   const handleReply = async () => {
     if (!selectedMsg || !replyBody.trim()) return
     setReplySending(true)
-    const res = await fetch('/api/gmail/send', {
+    const replyHtml = `<div style="font-family:sans-serif;color:#1e293b">${replyBody.replace(/\n/g, '<br>')}</div>
+<br><hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
+<div style="color:#64748b;font-size:13px;padding-left:12px;border-left:3px solid #334155">
+${selectedMsg.body}
+</div>`
+    const res = await fetch('/api/email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         to: selectedMsg.fromEmail,
         subject: `Re: ${selectedMsg.subject.replace(/^Re:\s*/i, '')}`,
-        html: `<div style="font-family:sans-serif">${replyBody.replace(/\n/g, '<br>')}</div>
-<br><br>
-<div style="color:#94a3b8;border-left:3px solid #334155;padding-left:12px;font-size:13px">
-${selectedMsg.body}
-</div>`,
-        threadId: selectedMsg.threadId,
+        html: replyHtml,
       }),
     })
     if (res.ok) {
       setReplySent(true)
       setReplyMode(false)
       setReplyBody('')
+      setTimeout(() => setReplySent(false), 4000)
+    } else {
+      const d = await res.json()
+      setComposeError(d.error || 'Erreur envoi réponse')
     }
     setReplySending(false)
   }
@@ -318,7 +327,7 @@ ${selectedMsg.body}
             className="mt-auto"
             onSubmit={e => {
               e.preventDefault()
-              if (searchQ.trim()) loadMessages('inbox', searchQ.trim())
+              loadMessages(panel, searchQ.trim() || undefined)
             }}
           >
             <input

@@ -44,7 +44,7 @@ function extractBody(payload: any): string {
 
 export interface GmailMessage {
   id: string
-  threadId: string
+  threadId?: string
   from: string
   fromName: string
   fromEmail: string
@@ -54,6 +54,7 @@ export interface GmailMessage {
   date: string
   timestamp: number
   isRead: boolean
+  folder?: string
   body?: string
 }
 
