@@ -102,15 +102,6 @@ export default function EmailsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Auto-refresh inbox every 30s ─────────────────────────────────────────
-  useEffect(() => {
-    if (panel !== 'inbox') return
-    const interval = setInterval(() => {
-      loadMessages('inbox')
-    }, 30000)
-    return () => clearInterval(interval)
-  }, [panel, loadMessages])
-
   // ── Load messages ────────────────────────────────────────────────────────
 
   const loadMessages = useCallback(async (folder: string, q?: string) => {
@@ -124,6 +115,15 @@ export default function EmailsPage() {
     setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
     setLoadingList(false)
   }, [])
+
+  // ── Auto-refresh inbox every 30s ─────────────────────────────────────────
+  useEffect(() => {
+    if (panel !== 'inbox') return
+    const interval = setInterval(() => {
+      loadMessages('inbox')
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [panel, loadMessages])
 
   const loadMessage = async (msg: GmailMessage) => {
     setLoadingMsg(true)
