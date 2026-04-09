@@ -81,6 +81,30 @@ model Session {
   appels       SessionAppel[]
 }
 
+model EmailInbound {
+  id          Int      @id @default(autoincrement())
+  messageId   String?  @unique
+  from        String
+  fromName    String   @default("")
+  fromEmail   String
+  to          String
+  subject     String
+  bodyHtml    String?
+  bodyText    String?
+  snippet     String?
+  isRead      Boolean  @default(false)
+  receivedAt  DateTime @default(now())
+}
+
+model EmailOutbound {
+  id         Int      @id @default(autoincrement())
+  to         String
+  toName     String   @default("")
+  subject    String
+  bodyHtml   String
+  sentAt     DateTime @default(now())
+}
+
 model SessionAppel {
   id              Int      @id @default(autoincrement())
   sessionId       Int

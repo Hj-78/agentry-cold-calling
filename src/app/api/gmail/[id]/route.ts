@@ -1,17 +1,55 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
-import { getMessage } from '@/lib/imap'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const { searchParams } = new URL(req.url)
-  const folder = searchParams.get('folder') === 'sent' ? 'Sent' : 'INBOX'
+  const folder = searchParams.get('folder') || 'inbox'
+  const id = parseInt(params.id)
 
   try {
-    const message = await getMessage(params.id, folder)
-    return NextResponse.json(message)
+    if (folder === 'sent') {
+      const m = await prisma.emailOutbound.findUnique({ where: { id } })
+      if (!m) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      return NextResponse.json({
+        id: String(m.id),
+        from: 'hugo@agentry.fr',
+        fromName: 'Hugo — Agentry',
+        fromEmail: 'hugo@agentry.fr',
+        to: m.to,
+        subject: m.subject,
+        snippet: '',
+        date: m.sentAt.toISOString(),
+        timestamp: m.sentAt.getTime(),
+        isRead: true,
+        body: m.bodyHtml,
+        folder: 'sent',
+      })
+    }
+
+    const m = await prisma.emailInbound.findUnique({ where: { id } })
+    if (!m) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Mark as read
+    if (!m.isRead) {
+      await prisma.emailInbound.update({ where: { id }, data: { isRead: true } })
+    }
+
+    return NextResponse.json({
+      id: String(m.id),
+      from: m.from,
+      fromName: m.fromName,
+      fromEmail: m.fromEmail,
+      to: m.to,
+      subject: m.subject,
+      snippet: m.snippet || '',
+      date: m.receivedAt.toISOString(),
+      timestamp: m.receivedAt.getTime(),
+      isRead: true,
+      body: m.bodyHtml || (m.bodyText ? `<pre style="white-space:pre-wrap;font-family:inherit">${m.bodyText}</pre>` : ''),
+      folder: 'inbox',
+    })
   } catch (err) {
-    const msg = String(err)
-    if (msg.includes('imap_not_configured')) return NextResponse.json({ error: 'imap_not_configured' }, { status: 403 })
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

@@ -57,18 +57,7 @@ export default function EmailsPage() {
   const [selectedMsg, setSelectedMsg] = useState<(GmailMessage & { body: string }) | null>(null)
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [searchQ, setSearchQ] = useState('')
-  const [authRequired, setAuthRequired] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
-
-  // IMAP config form
-  const [showImapForm, setShowImapForm] = useState(false)
-  const [imapHost, setImapHost] = useState('')
-  const [imapPort, setImapPort] = useState('993')
-  const [imapUser, setImapUser] = useState('hugo@agentry.fr')
-  const [imapPass, setImapPass] = useState('')
-  const [imapSaving, setImapSaving] = useState(false)
-  const [imapError, setImapError] = useState('')
 
   // Compose state
   const [agences, setAgences] = useState<Agence[]>([])
@@ -127,16 +116,8 @@ export default function EmailsPage() {
     if (q) params.set('q', q)
     const res = await fetch(`/api/gmail?${params}`)
     const data = await res.json()
-    if (res.status === 403) {
-      setAuthRequired(true)
-      setAuthError(data.error === 'imap_auth_error' ? 'Identifiants incorrects' : null)
-      setMessages([])
-    } else {
-      setAuthRequired(false)
-      setAuthError(null)
-      setMessages(data.messages || [])
-      setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
-    }
+    setMessages(data.messages || [])
+    setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
     setLoadingList(false)
   }, [])
 
@@ -153,24 +134,6 @@ export default function EmailsPage() {
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isRead: true } : m))
     }
     setLoadingMsg(false)
-  }
-
-  // ── Save IMAP config ─────────────────────────────────────────────────────
-
-  const saveImapConfig = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setImapSaving(true)
-    setImapError('')
-    const res = await fetch('/api/imap-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host: imapHost, port: imapPort, user: imapUser, pass: imapPass }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setImapError(data.error); setImapSaving(false); return }
-    setShowImapForm(false)
-    setImapSaving(false)
-    loadMessages('inbox')
   }
 
   // ── Compose template ─────────────────────────────────────────────────────
@@ -393,87 +356,8 @@ ${selectedMsg.body}
                 </button>
               </div>
 
-              {/* IMAP not configured */}
-              {authRequired && !showImapForm && (
-                <div className="flex flex-col items-center justify-center h-full gap-5 px-6 py-12 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-3xl">📧</div>
-                  <div>
-                    <p className="text-white font-semibold mb-1">Messagerie non configurée</p>
-                    <p className="text-slate-400 text-sm">
-                      {authError || 'Entre tes identifiants IMAP pour lire tes emails.'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowImapForm(true)}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl text-sm transition"
-                  >
-                    ⚙️ Configurer la messagerie
-                  </button>
-                </div>
-              )}
-
-              {/* IMAP config form */}
-              {authRequired && showImapForm && (
-                <div className="p-6 overflow-y-auto">
-                  <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => setShowImapForm(false)} className="text-slate-400 hover:text-white transition">
-                      ← Retour
-                    </button>
-                    <h3 className="text-white font-semibold">Configuration IMAP</h3>
-                  </div>
-                  <form onSubmit={saveImapConfig} className="space-y-4">
-                    <div>
-                      <label className="text-slate-400 text-xs font-medium block mb-1.5">
-                        Serveur IMAP
-                        <span className="text-slate-600 ml-2">(ex: ssl0.ovh.net, imap.infomaniak.com)</span>
-                      </label>
-                      <input required value={imapHost} onChange={e => setImapHost(e.target.value)}
-                        placeholder="ssl0.ovh.net"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-400 text-xs font-medium block mb-1.5">Port</label>
-                        <input required value={imapPort} onChange={e => setImapPort(e.target.value)}
-                          placeholder="993"
-                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
-                      </div>
-                      <div className="flex items-end pb-0.5">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" defaultChecked className="rounded" />
-                          <span className="text-slate-400 text-sm">SSL/TLS (port 993)</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-slate-400 text-xs font-medium block mb-1.5">Email / Identifiant</label>
-                      <input required type="email" value={imapUser} onChange={e => setImapUser(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
-                    </div>
-                    <div>
-                      <label className="text-slate-400 text-xs font-medium block mb-1.5">Mot de passe</label>
-                      <input required type="password" value={imapPass} onChange={e => setImapPass(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
-                    </div>
-                    {imapError && (
-                      <div className="bg-red-900/30 border border-red-500/50 rounded-xl px-4 py-3 text-red-400 text-sm">
-                        ⚠️ {imapError}
-                      </div>
-                    )}
-                    <button type="submit" disabled={imapSaving}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition">
-                      {imapSaving ? 'Test de connexion…' : 'Connecter'}
-                    </button>
-                    <p className="text-slate-600 text-xs text-center">
-                      Le mot de passe est stocké de façon sécurisée dans ta base de données Railway.
-                    </p>
-                  </form>
-                </div>
-              )}
-
               {/* Loading */}
-              {loadingList && !authRequired && (
+              {loadingList && (
                 <div className="flex flex-col gap-3 p-4">
                   {[...Array(8)].map((_, i) => (
                     <div key={i} className="animate-pulse flex gap-3 items-start">
@@ -489,7 +373,7 @@ ${selectedMsg.body}
               )}
 
               {/* Empty */}
-              {!loadingList && !authRequired && messages.length === 0 && (
+              {!loadingList && messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2">
                   <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -499,7 +383,7 @@ ${selectedMsg.body}
               )}
 
               {/* Message list */}
-              {!loadingList && messages.map(msg => (
+              {messages.map(msg => (
                 <button
                   key={msg.id}
                   onClick={() => loadMessage(msg)}
@@ -639,7 +523,7 @@ ${selectedMsg.body}
                 )}
               </div>
             ) : (
-              !loadingList && !authRequired && messages.length > 0 && (
+              !loadingList && messages.length > 0 && (
                 <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
                   <div className="text-center">
                     <svg className="w-12 h-12 mx-auto mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">

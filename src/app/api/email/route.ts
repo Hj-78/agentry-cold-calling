@@ -99,5 +99,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 
+  // Sauvegarder dans EmailOutbound pour afficher dans "Envoyés"
+  try {
+    await prisma.emailOutbound.create({
+      data: { to, toName: '', subject, bodyHtml: html },
+    })
+  } catch { /* non bloquant */ }
+
   return NextResponse.json({ ok: true })
 }
