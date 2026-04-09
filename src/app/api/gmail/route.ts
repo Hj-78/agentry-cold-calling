@@ -1,34 +1,34 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
-import { listMessages } from '@/lib/gmail'
+import { listMessages } from '@/lib/imap'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const folder = searchParams.get('folder') || 'inbox'
+  const folder = searchParams.get('folder') === 'sent' ? 'Sent' : 'INBOX'
   const q = searchParams.get('q') || ''
   const max = parseInt(searchParams.get('max') || '40')
 
-  let query = ''
-  if (q) {
-    query = q
-  } else if (folder === 'sent') {
-    query = 'in:sent'
-  } else if (folder === 'unread') {
-    query = 'in:inbox is:unread'
-  } else {
-    query = 'in:inbox'
-  }
-
   try {
-    const messages = await listMessages(query, max)
+    let messages = await listMessages(folder, max)
+    // Filtre de recherche côté serveur si query
+    if (q) {
+      const ql = q.toLowerCase()
+      messages = messages.filter(m =>
+        m.subject.toLowerCase().includes(ql) ||
+        m.fromName.toLowerCase().includes(ql) ||
+        m.fromEmail.toLowerCase().includes(ql)
+      )
+    }
     return NextResponse.json({ messages })
   } catch (err) {
     const msg = String(err)
-    const isAuthError = msg.includes('insufficient') || msg.includes('403') || msg.includes('401') || msg.includes('scope')
-    if (isAuthError) {
-      return NextResponse.json({ error: 'auth_required', messages: [] }, { status: 403 })
+    if (msg.includes('imap_not_configured')) {
+      return NextResponse.json({ error: 'imap_not_configured', messages: [] }, { status: 403 })
     }
-    console.error('[GMAIL] listMessages error:', err)
+    if (msg.includes('auth') || msg.includes('LOGIN') || msg.includes('credentials')) {
+      return NextResponse.json({ error: 'imap_auth_error', messages: [], detail: msg }, { status: 401 })
+    }
+    console.error('[IMAP] listMessages error:', err)
     return NextResponse.json({ error: msg, messages: [] }, { status: 500 })
   }
 }

@@ -58,8 +58,17 @@ export default function EmailsPage() {
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [authRequired, setAuthRequired] = useState(false)
-  const [authConnecting, setAuthConnecting] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+
+  // IMAP config form
+  const [showImapForm, setShowImapForm] = useState(false)
+  const [imapHost, setImapHost] = useState('')
+  const [imapPort, setImapPort] = useState('993')
+  const [imapUser, setImapUser] = useState('hugo@agentry.fr')
+  const [imapPass, setImapPass] = useState('')
+  const [imapSaving, setImapSaving] = useState(false)
+  const [imapError, setImapError] = useState('')
 
   // Compose state
   const [agences, setAgences] = useState<Agence[]>([])
@@ -118,11 +127,13 @@ export default function EmailsPage() {
     if (q) params.set('q', q)
     const res = await fetch(`/api/gmail?${params}`)
     const data = await res.json()
-    if (res.status === 403 && data.error === 'auth_required') {
+    if (res.status === 403) {
       setAuthRequired(true)
+      setAuthError(data.error === 'imap_auth_error' ? 'Identifiants incorrects' : null)
       setMessages([])
     } else {
       setAuthRequired(false)
+      setAuthError(null)
       setMessages(data.messages || [])
       setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
     }
@@ -144,13 +155,22 @@ export default function EmailsPage() {
     setLoadingMsg(false)
   }
 
-  // ── Connect Gmail OAuth ──────────────────────────────────────────────────
+  // ── Save IMAP config ─────────────────────────────────────────────────────
 
-  const connectGmail = async () => {
-    setAuthConnecting(true)
-    const res = await fetch('/api/auth/google')
-    const { url } = await res.json()
-    window.location.href = url
+  const saveImapConfig = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setImapSaving(true)
+    setImapError('')
+    const res = await fetch('/api/imap-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host: imapHost, port: imapPort, user: imapUser, pass: imapPass }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setImapError(data.error); setImapSaving(false); return }
+    setShowImapForm(false)
+    setImapSaving(false)
+    loadMessages('inbox')
   }
 
   // ── Compose template ─────────────────────────────────────────────────────
@@ -373,29 +393,82 @@ ${selectedMsg.body}
                 </button>
               </div>
 
-              {/* Auth required */}
-              {authRequired && (
+              {/* IMAP not configured */}
+              {authRequired && !showImapForm && (
                 <div className="flex flex-col items-center justify-center h-full gap-5 px-6 py-12 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-3xl">
-                    📧
-                  </div>
+                  <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-3xl">📧</div>
                   <div>
-                    <p className="text-white font-semibold mb-1">Gmail non connecté</p>
-                    <p className="text-slate-400 text-sm">Connecte ton compte Google pour lire tes emails.</p>
+                    <p className="text-white font-semibold mb-1">Messagerie non configurée</p>
+                    <p className="text-slate-400 text-sm">
+                      {authError || 'Entre tes identifiants IMAP pour lire tes emails.'}
+                    </p>
                   </div>
                   <button
-                    onClick={connectGmail}
-                    disabled={authConnecting}
-                    className="bg-white text-slate-900 font-semibold px-6 py-3 rounded-xl text-sm flex items-center gap-2 hover:bg-slate-100 transition disabled:opacity-60"
+                    onClick={() => setShowImapForm(true)}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl text-sm transition"
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    {authConnecting ? 'Connexion…' : 'Connecter Gmail'}
+                    ⚙️ Configurer la messagerie
                   </button>
+                </div>
+              )}
+
+              {/* IMAP config form */}
+              {authRequired && showImapForm && (
+                <div className="p-6 overflow-y-auto">
+                  <div className="flex items-center gap-3 mb-6">
+                    <button onClick={() => setShowImapForm(false)} className="text-slate-400 hover:text-white transition">
+                      ← Retour
+                    </button>
+                    <h3 className="text-white font-semibold">Configuration IMAP</h3>
+                  </div>
+                  <form onSubmit={saveImapConfig} className="space-y-4">
+                    <div>
+                      <label className="text-slate-400 text-xs font-medium block mb-1.5">
+                        Serveur IMAP
+                        <span className="text-slate-600 ml-2">(ex: ssl0.ovh.net, imap.infomaniak.com)</span>
+                      </label>
+                      <input required value={imapHost} onChange={e => setImapHost(e.target.value)}
+                        placeholder="ssl0.ovh.net"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-slate-400 text-xs font-medium block mb-1.5">Port</label>
+                        <input required value={imapPort} onChange={e => setImapPort(e.target.value)}
+                          placeholder="993"
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                      </div>
+                      <div className="flex items-end pb-0.5">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" defaultChecked className="rounded" />
+                          <span className="text-slate-400 text-sm">SSL/TLS (port 993)</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-slate-400 text-xs font-medium block mb-1.5">Email / Identifiant</label>
+                      <input required type="email" value={imapUser} onChange={e => setImapUser(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 text-xs font-medium block mb-1.5">Mot de passe</label>
+                      <input required type="password" value={imapPass} onChange={e => setImapPass(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                    </div>
+                    {imapError && (
+                      <div className="bg-red-900/30 border border-red-500/50 rounded-xl px-4 py-3 text-red-400 text-sm">
+                        ⚠️ {imapError}
+                      </div>
+                    )}
+                    <button type="submit" disabled={imapSaving}
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition">
+                      {imapSaving ? 'Test de connexion…' : 'Connecter'}
+                    </button>
+                    <p className="text-slate-600 text-xs text-center">
+                      Le mot de passe est stocké de façon sécurisée dans ta base de données Railway.
+                    </p>
+                  </form>
                 </div>
               )}
 
