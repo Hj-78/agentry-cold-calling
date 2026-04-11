@@ -12,6 +12,7 @@ interface AgenceImport {
   source?: string | null
   googlePlaceId?: string | null
   statut?: string
+  horaires?: string | null
 }
 
 export async function POST(req: Request) {
@@ -22,10 +23,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Expected array of agencies' }, { status: 400 })
   }
 
+  // Load existing phones + names to detect duplicates
+  const existing = await prisma.agence.findMany({ select: { nom: true, telephone: true } })
+  const existingPhones = new Set(
+    existing.filter(e => e.telephone).map(e => e.telephone!.replace(/\s/g, '').toLowerCase())
+  )
+  const existingNames = new Set(existing.map(e => e.nom.toLowerCase().trim()))
+
+  let added = 0
+  let duplicates = 0
+  const toInsert: AgenceImport[] = []
+
+  for (const a of agences) {
+    if (!a.nom?.trim()) continue
+    const phone = (a.telephone || '').replace(/\s/g, '').toLowerCase()
+    const name = a.nom.toLowerCase().trim()
+
+    if ((phone && existingPhones.has(phone)) || existingNames.has(name)) {
+      duplicates++
+      continue
+    }
+    toInsert.push(a)
+    if (phone) existingPhones.add(phone)
+    existingNames.add(name)
+  }
+
   // Insert in batches of 100
-  let inserted = 0
-  for (let i = 0; i < agences.length; i += 100) {
-    const batch = agences.slice(i, i + 100)
+  for (let i = 0; i < toInsert.length; i += 100) {
+    const batch = toInsert.slice(i, i + 100)
     await prisma.agence.createMany({
       data: batch.map(a => ({
         nom: a.nom,
@@ -33,14 +58,14 @@ export async function POST(req: Request) {
         email: a.email || null,
         adresse: a.adresse || null,
         ville: a.ville || null,
-        notes: a.notes || null,
+        notes: a.horaires ? `Horaires : ${a.horaires}` : (a.notes || null),
         source: a.source || 'import',
         googlePlaceId: a.googlePlaceId || null,
         statut: a.statut || 'nouveau',
       })),
     })
-    inserted += batch.length
+    added += batch.length
   }
 
-  return NextResponse.json({ ok: true, inserted })
+  return NextResponse.json({ added, duplicates, errors: 0, ok: true })
 }

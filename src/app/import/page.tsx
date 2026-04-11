@@ -1,0 +1,549 @@
+'use client'
+
+import { useState, useCallback, useRef } from 'react'
+import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface ParsedAgence {
+  nom: string
+  telephone: string
+  ville: string
+  adresse: string
+  horaires: string
+}
+
+interface ImportResult {
+  added: number
+  duplicates: number
+  errors: number
+}
+
+interface ScrapeResult {
+  nom: string
+  telephone: string
+  adresse: string
+  ville: string
+  horaires: string
+  website?: string
+}
+
+// ─── Column detection ────────────────────────────────────────────────────────
+
+const COLUMN_MAP: Record<string, keyof ParsedAgence> = {
+  // Nom
+  name: 'nom', nom: 'nom', title: 'nom', 'business name': 'nom',
+  entreprise: 'nom', établissement: 'nom', raison: 'nom',
+  // Téléphone
+  phone: 'telephone', téléphone: 'telephone', telephone: 'telephone',
+  tel: 'telephone', mobile: 'telephone', 'numéro': 'telephone',
+  numero: 'telephone', 'phone number': 'telephone', 'contact': 'telephone',
+  // Ville
+  city: 'ville', ville: 'ville', locality: 'ville', localité: 'ville',
+  commune: 'ville', municipality: 'ville',
+  // Adresse
+  address: 'adresse', adresse: 'adresse', rue: 'adresse',
+  'street address': 'adresse', location: 'adresse',
+  // Horaires
+  hours: 'horaires', horaires: 'horaires', 'opening hours': 'horaires',
+  "heures d'ouverture": 'horaires', schedule: 'horaires', timetable: 'horaires',
+}
+
+function detectColumn(header: string): keyof ParsedAgence | null {
+  const h = header.toLowerCase().trim()
+  if (COLUMN_MAP[h]) return COLUMN_MAP[h]
+  // Partial match
+  for (const [key, field] of Object.entries(COLUMN_MAP)) {
+    if (h.includes(key) || key.includes(h)) return field
+  }
+  return null
+}
+
+function mapRow(row: Record<string, string>, mapping: Record<string, keyof ParsedAgence>): ParsedAgence {
+  const result: ParsedAgence = { nom: '', telephone: '', ville: '', adresse: '', horaires: '' }
+  for (const [col, field] of Object.entries(mapping)) {
+    const val = (row[col] || '').toString().trim()
+    if (val && !result[field]) result[field] = val
+  }
+  return result
+}
+
+function parseRows(rawRows: Record<string, string>[]): { rows: ParsedAgence[]; mapping: Record<string, keyof ParsedAgence> } {
+  if (!rawRows.length) return { rows: [], mapping: {} }
+  const headers = Object.keys(rawRows[0])
+  const mapping: Record<string, keyof ParsedAgence> = {}
+  for (const h of headers) {
+    const field = detectColumn(h)
+    if (field) mapping[h] = field
+  }
+  const rows = rawRows
+    .map(r => mapRow(r, mapping))
+    .filter(r => r.nom.trim())
+  return { rows, mapping }
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+export default function ImportPage() {
+  const [tab, setTab] = useState<'file' | 'scrape'>('file')
+
+  // File state
+  const [dragging, setDragging] = useState(false)
+  const [fileName, setFileName] = useState('')
+  const [parsed, setParsed] = useState<ParsedAgence[]>([])
+  const [rawCount, setRawCount] = useState(0)
+  const [duplicateCount, setDuplicateCount] = useState(0)
+  const [mapping, setMapping] = useState<Record<string, keyof ParsedAgence>>({})
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [parseError, setParseError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Scrape state
+  const [keyword, setKeyword] = useState('agence immobilière')
+  const [scrapeCity, setScrapeCity] = useState('')
+  const [scraping, setScraping] = useState(false)
+  const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([])
+  const [scrapeStatus, setScrapeStatus] = useState('')
+  const [scrapeError, setScrapeError] = useState('')
+  const [scrapeImporting, setScrapeImporting] = useState(false)
+  const [scrapeImportResult, setScrapeImportResult] = useState<ImportResult | null>(null)
+
+  // ── File parsing ──────────────────────────────────────────────────────────
+
+  const processFile = useCallback(async (file: File) => {
+    setParseError('')
+    setImportResult(null)
+    setParsed([])
+    setFileName(file.name)
+
+    const ext = file.name.split('.').pop()?.toLowerCase()
+
+    try {
+      let rawRows: Record<string, string>[] = []
+
+      if (ext === 'csv') {
+        const text = await file.text()
+        const result = Papa.parse<Record<string, string>>(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: h => h.trim(),
+        })
+        rawRows = result.data
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const buffer = await file.arrayBuffer()
+        const wb = XLSX.read(buffer, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        rawRows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' })
+      } else {
+        setParseError('Format non supporté. Utilisez .csv, .xlsx ou .xls')
+        return
+      }
+
+      setRawCount(rawRows.length)
+      const { rows, mapping: m } = parseRows(rawRows)
+      setMapping(m)
+
+      // Detect duplicates locally (by nom + telephone)
+      const seen = new Set<string>()
+      let dupes = 0
+      const unique: ParsedAgence[] = []
+      for (const r of rows) {
+        const key = `${r.nom.toLowerCase().trim()}|${r.telephone.replace(/\s/g, '')}`
+        if (seen.has(key)) { dupes++; continue }
+        seen.add(key)
+        unique.push(r)
+      }
+      setDuplicateCount(dupes)
+      setParsed(unique)
+    } catch (e) {
+      setParseError(`Erreur de lecture : ${e instanceof Error ? e.message : 'Inconnue'}`)
+    }
+  }, [])
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) processFile(file)
+    e.target.value = ''
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) processFile(file)
+  }
+
+  // ── Import ────────────────────────────────────────────────────────────────
+
+  const handleImport = async () => {
+    if (!parsed.length) return
+    setImporting(true)
+    try {
+      const agences = parsed.map(r => ({
+        nom: r.nom,
+        telephone: r.telephone || null,
+        ville: r.ville || null,
+        adresse: r.adresse || null,
+        horaires: r.horaires || null,
+        source: 'import_fichier',
+      }))
+      const res = await fetch('/api/agences/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agences }),
+      })
+      const data = await res.json()
+      setImportResult(data)
+      setParsed([])
+      setFileName('')
+    } catch {
+      setParseError('Erreur lors de l\'import')
+    }
+    setImporting(false)
+  }
+
+  // ── Scraping ──────────────────────────────────────────────────────────────
+
+  const handleScrape = async () => {
+    if (!scrapeCity.trim()) return
+    setScraping(true)
+    setScrapeResults([])
+    setScrapeError('')
+    setScrapeStatus('Lancement du scraping…')
+    setScrapeImportResult(null)
+
+    try {
+      const res = await fetch('/api/scrape/googlemaps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: keyword.trim(), city: scrapeCity.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setScrapeError(data.error || 'Erreur scraping')
+        setScrapeStatus('')
+      } else {
+        setScrapeResults(data.results || [])
+        setScrapeStatus(`${(data.results || []).length} résultats trouvés`)
+      }
+    } catch (e) {
+      setScrapeError(`Erreur : ${e instanceof Error ? e.message : 'Inconnue'}`)
+      setScrapeStatus('')
+    }
+    setScraping(false)
+  }
+
+  const handleScrapeImport = async () => {
+    if (!scrapeResults.length) return
+    setScrapeImporting(true)
+    try {
+      const agences = scrapeResults.map(r => ({
+        nom: r.nom,
+        telephone: r.telephone || null,
+        ville: r.ville || null,
+        adresse: r.adresse || null,
+        source: 'scraping_googlemaps',
+      }))
+      const res = await fetch('/api/agences/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agences }),
+      })
+      const data = await res.json()
+      setScrapeImportResult(data)
+      setScrapeResults([])
+    } catch {
+      setScrapeError('Erreur import')
+    }
+    setScrapeImporting(false)
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-12">
+
+      {/* Header */}
+      <div className="mb-6 md:mb-10">
+        <h1 className="text-2xl md:text-3xl font-bold text-white">Import</h1>
+        <p className="text-slate-500 text-sm mt-1">Importez des agences depuis un fichier ou scrapez Google Maps</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-800 mb-6">
+        {([
+          { key: 'file', label: '📁 Fichier CSV / XLSX' },
+          { key: 'scrape', label: '🗺 Google Maps' },
+        ] as { key: typeof tab; label: string }[]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition -mb-px ${
+              tab === t.key ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── FILE TAB ── */}
+      {tab === 'file' && (
+        <div className="space-y-5">
+
+          {/* Zone de dépôt */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            className={`relative border-2 border-dashed rounded-2xl p-8 md:p-12 text-center transition cursor-pointer ${
+              dragging ? 'border-indigo-500 bg-indigo-900/20' : 'border-slate-700 hover:border-slate-600 bg-slate-900/50'
+            }`}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={handleFileInput}
+            />
+            <div className="text-4xl mb-3">📂</div>
+            <p className="text-white font-semibold mb-1">
+              {fileName ? `📄 ${fileName}` : 'Glisser un fichier ici'}
+            </p>
+            <p className="text-slate-500 text-sm mb-4">ou</p>
+            <button
+              type="button"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-semibold text-sm transition min-h-[48px]"
+              onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
+            >
+              Choisir un fichier
+            </button>
+            <p className="text-slate-600 text-xs mt-4">CSV, XLSX, XLS — colonnes auto-détectées</p>
+          </div>
+
+          {parseError && (
+            <div className="bg-red-900/30 border border-red-500/50 rounded-2xl px-5 py-4 text-red-400 text-sm">
+              ⚠️ {parseError}
+            </div>
+          )}
+
+          {/* Résultat de parsing */}
+          {parsed.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+              {/* Résumé */}
+              <div className="px-5 py-4 border-b border-slate-800 flex flex-wrap gap-4 items-center">
+                <div>
+                  <span className="text-white font-bold text-xl">{rawCount}</span>
+                  <span className="text-slate-500 text-sm ml-1">lignes détectées</span>
+                </div>
+                <div>
+                  <span className="text-green-400 font-bold text-xl">{parsed.length}</span>
+                  <span className="text-slate-500 text-sm ml-1">à importer</span>
+                </div>
+                {duplicateCount > 0 && (
+                  <div>
+                    <span className="text-amber-400 font-bold text-xl">{duplicateCount}</span>
+                    <span className="text-slate-500 text-sm ml-1">doublons ignorés</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Colonnes détectées */}
+              {Object.keys(mapping).length > 0 && (
+                <div className="px-5 py-3 border-b border-slate-800">
+                  <p className="text-slate-500 text-xs mb-2">Colonnes mappées :</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(mapping).map(([col, field]) => (
+                      <span key={col} className="bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-lg">
+                        <span className="text-slate-500">{col}</span> → <span className="text-indigo-400 font-medium">{field}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Aperçu 5 premières lignes */}
+              <div className="divide-y divide-slate-800">
+                {parsed.slice(0, 5).map((row, i) => (
+                  <div key={i} className="px-5 py-3">
+                    <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
+                      <span className="text-white font-medium text-sm">{row.nom}</span>
+                      {row.ville && <span className="text-slate-500 text-xs">{row.ville}</span>}
+                      {row.telephone && <span className="text-indigo-400 text-xs">{row.telephone}</span>}
+                    </div>
+                    {row.adresse && <p className="text-slate-600 text-xs mt-0.5">{row.adresse}</p>}
+                  </div>
+                ))}
+                {parsed.length > 5 && (
+                  <div className="px-5 py-3 text-slate-600 text-xs">
+                    + {parsed.length - 5} autres agences…
+                  </div>
+                )}
+              </div>
+
+              {/* Bouton import */}
+              <div className="px-5 py-4 border-t border-slate-800">
+                <button
+                  onClick={handleImport}
+                  disabled={importing}
+                  className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-base transition min-h-[56px]"
+                >
+                  {importing ? 'Import en cours…' : `📥 Importer ${parsed.length} agence${parsed.length > 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Résultat import */}
+          {importResult && (
+            <div className="bg-green-900/20 border border-green-700/50 rounded-2xl px-5 py-5 text-center">
+              <div className="text-4xl mb-3">✅</div>
+              <p className="text-green-300 font-bold text-lg">Import terminé !</p>
+              <p className="text-slate-400 text-sm mt-2">
+                <span className="text-green-400 font-bold">{importResult.added}</span> agences ajoutées
+                {importResult.duplicates > 0 && (
+                  <> · <span className="text-amber-400 font-bold">{importResult.duplicates}</span> doublons ignorés</>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Format info */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <p className="text-slate-400 text-sm font-semibold mb-3">📋 Colonnes reconnues automatiquement</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                { field: 'Nom', aliases: 'name, nom, title, business name' },
+                { field: 'Téléphone', aliases: 'phone, tel, mobile, numéro' },
+                { field: 'Ville', aliases: 'city, ville, locality' },
+                { field: 'Adresse', aliases: 'address, adresse, rue' },
+                { field: 'Horaires', aliases: 'hours, horaires, opening hours' },
+              ].map(item => (
+                <div key={item.field} className="bg-slate-800 rounded-xl px-4 py-3">
+                  <p className="text-indigo-400 text-xs font-semibold">{item.field}</p>
+                  <p className="text-slate-500 text-xs mt-0.5">{item.aliases}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SCRAPE TAB ── */}
+      {tab === 'scrape' && (
+        <div className="space-y-5">
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <h2 className="text-white font-semibold">🗺 Scraper Google Maps</h2>
+            <p className="text-slate-500 text-sm">Récupère automatiquement les agences immobilières d'une ville depuis Google Maps, sans API payante.</p>
+
+            <div>
+              <label className="text-slate-400 text-sm block mb-2">Mot-clé</label>
+              <input
+                type="text"
+                value={keyword}
+                onChange={e => setKeyword(e.target.value)}
+                placeholder="agence immobilière"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-base focus:outline-none focus:border-indigo-500 min-h-[48px]"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 text-sm block mb-2">Ville *</label>
+              <input
+                type="text"
+                value={scrapeCity}
+                onChange={e => setScrapeCity(e.target.value)}
+                placeholder="ex: Paris, Lyon, Bordeaux…"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-base focus:outline-none focus:border-indigo-500 min-h-[48px]"
+              />
+            </div>
+
+            <button
+              onClick={handleScrape}
+              disabled={scraping || !scrapeCity.trim()}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-4 rounded-xl font-bold text-base transition min-h-[56px] flex items-center justify-center gap-2"
+            >
+              {scraping ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Scraping en cours…
+                </>
+              ) : (
+                '🔍 Lancer le scraping'
+              )}
+            </button>
+
+            {scrapeStatus && !scraping && (
+              <p className="text-green-400 text-sm text-center">{scrapeStatus}</p>
+            )}
+          </div>
+
+          {scrapeError && (
+            <div className="bg-red-900/30 border border-red-500/50 rounded-2xl px-5 py-4 text-red-400 text-sm">
+              ⚠️ {scrapeError}
+            </div>
+          )}
+
+          {/* Résultats scraping */}
+          {scrapeResults.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+                <span className="text-white font-semibold">{scrapeResults.length} résultats</span>
+                <span className="text-slate-500 text-xs">Aperçu</span>
+              </div>
+
+              <div className="divide-y divide-slate-800 max-h-80 overflow-y-auto">
+                {scrapeResults.map((r, i) => (
+                  <div key={i} className="px-5 py-3">
+                    <p className="text-white font-medium text-sm">{r.nom}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      {r.ville && <span className="text-slate-500 text-xs">{r.ville}</span>}
+                      {r.telephone && <span className="text-indigo-400 text-xs">{r.telephone}</span>}
+                    </div>
+                    {r.adresse && <p className="text-slate-600 text-xs mt-0.5 truncate">{r.adresse}</p>}
+                  </div>
+                ))}
+              </div>
+
+              <div className="px-5 py-4 border-t border-slate-800">
+                <button
+                  onClick={handleScrapeImport}
+                  disabled={scrapeImporting}
+                  className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-base transition min-h-[56px]"
+                >
+                  {scrapeImporting ? 'Import en cours…' : `📥 Importer ${scrapeResults.length} agences dans le CRM`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {scrapeImportResult && (
+            <div className="bg-green-900/20 border border-green-700/50 rounded-2xl px-5 py-5 text-center">
+              <div className="text-4xl mb-3">✅</div>
+              <p className="text-green-300 font-bold text-lg">Import terminé !</p>
+              <p className="text-slate-400 text-sm mt-2">
+                <span className="text-green-400 font-bold">{scrapeImportResult.added}</span> agences ajoutées
+                {scrapeImportResult.duplicates > 0 && (
+                  <> · <span className="text-amber-400 font-bold">{scrapeImportResult.duplicates}</span> doublons ignorés</>
+                )}
+              </p>
+            </div>
+          )}
+
+          <div className="bg-amber-900/20 border border-amber-700/30 rounded-2xl px-5 py-4">
+            <p className="text-amber-300 text-sm font-semibold mb-1">⚠️ Note</p>
+            <p className="text-slate-400 text-sm">Le scraping utilise un navigateur headless. Il peut prendre 30 à 60 secondes selon la ville. Respecte un délai minimum entre chaque action pour éviter le blocage.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

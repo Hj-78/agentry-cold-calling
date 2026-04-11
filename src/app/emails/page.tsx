@@ -257,10 +257,41 @@ ${selectedMsg.body}
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[100dvh] overflow-hidden">
 
-      {/* ── Sidebar ── */}
-      <aside className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col py-4 px-3 gap-1">
+      {/* ── Mobile top tab bar ── */}
+      <div className="md:hidden flex border-b border-slate-800 bg-slate-950 shrink-0 overflow-x-auto">
+        {([
+          { key: 'inbox', label: '📥 Inbox', badge: unreadCount },
+          { key: 'sent', label: '📤 Envoyés', badge: 0 },
+          { key: 'compose', label: '✏️ Composer', badge: 0 },
+          { key: 'templates', label: '📋 Templates', badge: 0 },
+        ] as { key: Panel; label: string; badge: number }[]).map(item => (
+          <button
+            key={item.key}
+            onClick={() => {
+              setPanel(item.key)
+              setSelectedMsg(null)
+              if (item.key === 'inbox' || item.key === 'sent') loadMessages(item.key)
+            }}
+            className={`flex items-center gap-1 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition ${
+              panel === item.key
+                ? 'border-indigo-500 text-indigo-400'
+                : 'border-transparent text-slate-500'
+            }`}
+          >
+            {item.label}
+            {item.badge > 0 && (
+              <span className="bg-indigo-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                {item.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Sidebar desktop ── */}
+      <aside className="hidden md:flex w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex-col py-4 px-3 gap-1">
         <button
           onClick={() => setPanel('compose')}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-2xl px-4 py-3 mb-3 transition text-sm"
@@ -347,8 +378,8 @@ ${selectedMsg.body}
         {/* ── Inbox / Sent list ── */}
         {(panel === 'inbox' || panel === 'sent') && (
           <>
-            {/* Message list */}
-            <div className={`flex flex-col border-r border-slate-800 overflow-y-auto ${selectedMsg ? 'w-80 flex-shrink-0' : 'flex-1'}`}>
+            {/* Message list — caché sur mobile quand un message est sélectionné */}
+            <div className={`flex flex-col border-r border-slate-800 overflow-y-auto ${selectedMsg ? 'hidden md:flex md:w-80 md:flex-shrink-0' : 'flex-1'}`}>
               {/* Header */}
               <div className="sticky top-0 bg-slate-950 border-b border-slate-800 px-4 py-3 flex items-center justify-between z-10">
                 <h2 className="text-white font-semibold text-sm">
@@ -429,7 +460,17 @@ ${selectedMsg.body}
             {selectedMsg ? (
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className="border-b border-slate-800 px-6 py-4">
+                <div className="border-b border-slate-800 px-4 md:px-6 py-3 md:py-4">
+                  {/* Bouton retour mobile */}
+                  <button
+                    onClick={() => setSelectedMsg(null)}
+                    className="md:hidden flex items-center gap-1.5 text-slate-400 text-sm mb-3"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Retour
+                  </button>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="text-white font-semibold text-base mb-1">{selectedMsg.subject}</h3>
@@ -462,7 +503,7 @@ ${selectedMsg.body}
                       </button>
                       <button
                         onClick={() => setSelectedMsg(null)}
-                        className="p-2 text-slate-500 hover:text-white transition rounded-xl hover:bg-slate-800"
+                        className="hidden md:block p-2 text-slate-500 hover:text-white transition rounded-xl hover:bg-slate-800"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

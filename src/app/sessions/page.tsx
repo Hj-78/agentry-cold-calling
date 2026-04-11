@@ -142,10 +142,10 @@ export default function SessionsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10 md:py-14">
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-14">
 
       {/* Header */}
-      <div className="mb-10 flex items-start justify-between">
+      <div className="mb-6 md:mb-10 flex items-start justify-between">
         <div>
           <p className="text-slate-500 text-base mb-1">{sessions.length} session{sessions.length > 1 ? 's' : ''} passée{sessions.length > 1 ? 's' : ''}</p>
           <h1 className="text-3xl font-bold text-white">Sessions</h1>
@@ -169,7 +169,7 @@ export default function SessionsPage() {
       </div>
 
       {/* Lancer une session */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 mb-8">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-8 mb-6 md:mb-8">
         <h2 className="text-white font-semibold text-xl mb-1">Lancer une session</h2>
         <p className="text-slate-500 text-sm mb-6">Transcription automatique · Analyse IA · Résumé de fin de session</p>
 
@@ -187,7 +187,7 @@ export default function SessionsPage() {
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 onClick={() => { setVillesChoisies([]); setObjectif(Math.min(disponibles ?? 50, 50)) }}
                 className={`py-3 px-4 rounded-xl text-sm font-semibold transition border ${
@@ -275,7 +275,7 @@ export default function SessionsPage() {
         <button
           onClick={launchSession}
           disabled={launching || dispoTotal === 0}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-lg md:text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50 min-h-[56px]"
         >
           {launching ? 'Démarrage…' : villesChoisies.length > 0 ? `▶ Lancer — ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : '▶ Lancer la session'}
         </button>

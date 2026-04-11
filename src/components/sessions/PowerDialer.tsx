@@ -500,8 +500,8 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
         {/* QUALIFICATION */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
 
-          {/* Résultats — grille */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* Résultats — vertical sur mobile, grille 2 col sur desktop */}
+          <div className="flex flex-col md:grid md:grid-cols-2 gap-2.5">
             {RESULTATS.map(r => (
               <button key={r.value}
                 onClick={() => {
@@ -510,7 +510,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                   if (r.value === 'interesse') setAPitche(true)
                   if (r.value === 'rappeler' && newVal === 'rappeler') setShowRappelModal(true)
                 }}
-                className={`py-4 rounded-xl text-sm font-bold transition border ${
+                className={`py-4 rounded-xl text-base font-bold transition border min-h-[56px] ${
                   resultat === r.value
                     ? r.color + ' text-white ' + r.active
                     : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
@@ -792,8 +792,8 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
       {/* Bouton SUIVANT */}
       <div className="bg-slate-900 border-t border-slate-800 px-5 py-4 flex-shrink-0">
         <button onClick={saveAndNext} disabled={savingAppel || aiLoading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-5 rounded-2xl text-xl font-bold transition active:scale-95 shadow-xl shadow-indigo-900/40">
-          {savingAppel || aiLoading ? '…' : `→ Agence suivante`}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-5 rounded-2xl text-lg md:text-xl font-bold transition active:scale-95 shadow-xl shadow-indigo-900/40 min-h-[64px]">
+          {savingAppel || aiLoading ? '…' : `✓ Valider et agence suivante`}
         </button>
       </div>
 
