@@ -18,6 +18,17 @@ export default function ParametresPage() {
   const [smtpSaving, setSmtpSaving] = useState(false)
   const [smtpSaved, setSmtpSaved] = useState(false)
 
+  // IMAP
+  const [imapHost, setImapHost] = useState('')
+  const [imapPort, setImapPort] = useState('993')
+  const [imapUser, setImapUser] = useState('')
+  const [imapPass, setImapPass] = useState('')
+  const [imapSecure, setImapSecure] = useState(true)
+  const [imapConfigured, setImapConfigured] = useState(false)
+  const [imapSaving, setImapSaving] = useState(false)
+  const [imapSaved, setImapSaved] = useState(false)
+  const [imapError, setImapError] = useState('')
+
   // iCloud Calendar
   const [icloudAppleId, setIcloudAppleId] = useState('')
   const [icloudAppPass, setIcloudAppPass] = useState('')
@@ -35,6 +46,15 @@ export default function ParametresPage() {
       if (data.SMTP_USER) setSmtpUser(data.SMTP_USER)
       if (data.SMTP_PASS) setSmtpPass(data.SMTP_PASS)
       if (data.SMTP_FROM) setSmtpFrom(data.SMTP_FROM)
+    }).catch(() => {})
+
+    // IMAP
+    fetch('/api/imap-config').then(r => r.json()).then(d => {
+      setImapConfigured(d.configured)
+      if (d.host) setImapHost(d.host)
+      if (d.port) setImapPort(String(d.port))
+      if (d.user) setImapUser(d.user)
+      if (d.secure !== undefined) setImapSecure(d.secure)
     }).catch(() => {})
 
     // Vérifier connexion iCloud Calendar
@@ -114,6 +134,32 @@ export default function ParametresPage() {
     setIcloudConnected(false)
     setIcloudAppleId('')
     setIcloudAppPass('')
+  }
+
+  const handleSaveImap = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setImapSaving(true)
+    setImapError('')
+    setImapSaved(false)
+    try {
+      const res = await fetch('/api/imap-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: imapHost, port: imapPort, secure: imapSecure, user: imapUser, pass: imapPass }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setImapConfigured(true)
+        setImapSaved(true)
+        setImapPass('')
+        setTimeout(() => setImapSaved(false), 4000)
+      } else {
+        setImapError(data.error || 'Connexion IMAP échouée')
+      }
+    } catch {
+      setImapError('Erreur réseau')
+    }
+    setImapSaving(false)
   }
 
   const handleExportCSV = async () => {
@@ -275,6 +321,90 @@ export default function ParametresPage() {
           className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-semibold text-base transition disabled:opacity-50 mb-8"
         >
           {smtpSaving ? 'Enregistrement…' : smtpSaved ? '✅ Config email sauvegardée !' : '💾 Sauvegarder config email'}
+        </button>
+      </form>
+
+      {/* IMAP */}
+      <form onSubmit={handleSaveImap}>
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 mb-5">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-white font-semibold text-lg">📬 Réception IMAP</h2>
+            {imapConfigured && (
+              <span className="flex items-center gap-1.5 text-xs text-green-400">
+                <span className="w-2 h-2 rounded-full bg-green-400" />
+                Connecté
+              </span>
+            )}
+          </div>
+          <p className="text-slate-500 text-sm mb-1">
+            Connecte hugo@agentry.fr via IMAP pour lire tes emails directement dans l&apos;app et sur iPhone.
+          </p>
+          <p className="text-slate-600 text-xs mb-6">
+            Si tu utilises <strong className="text-slate-500">Zoho Mail</strong> : host = imap.zoho.eu · port = 993 · SSL.{' '}
+            <strong className="text-slate-500">Gmail Workspace</strong> : host = imap.gmail.com · port = 993.{' '}
+            <strong className="text-slate-500">OVH</strong> : host = ssl0.ovh.net · port = 993.
+          </p>
+
+          {imapSaved && (
+            <div className="bg-green-900/30 border border-green-700 rounded-xl p-3 mb-4 text-green-300 text-sm">
+              ✅ Connexion IMAP réussie et sauvegardée !
+            </div>
+          )}
+          {imapError && (
+            <div className="bg-red-900/30 border border-red-700 rounded-xl p-3 mb-4 text-red-300 text-sm">
+              ❌ {imapError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-500 text-xs font-medium block mb-1.5">Serveur IMAP</label>
+                <input type="text" placeholder="imap.zoho.eu" value={imapHost} onChange={e => setImapHost(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="text-slate-500 text-xs font-medium block mb-1.5">Port</label>
+                <input type="number" placeholder="993" value={imapPort} onChange={e => setImapPort(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setImapSecure(s => !s)}
+                className={`relative w-11 h-6 rounded-full transition ${imapSecure ? 'bg-indigo-600' : 'bg-slate-700'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${imapSecure ? 'translate-x-5' : ''}`} />
+              </button>
+              <span className="text-slate-400 text-sm">SSL/TLS (recommandé)</span>
+            </div>
+            <div>
+              <label className="text-slate-500 text-xs font-medium block mb-1.5">Adresse email</label>
+              <input type="email" placeholder="hugo@agentry.fr" value={imapUser} onChange={e => setImapUser(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label className="text-slate-500 text-xs font-medium block mb-1.5">Mot de passe</label>
+              <input type="password" placeholder="••••••••••••" value={imapPass} onChange={e => setImapPass(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          {/* Instructions iPhone */}
+          {imapConfigured && (
+            <div className="mt-6 p-4 bg-slate-800/60 rounded-2xl border border-slate-700">
+              <p className="text-slate-300 text-xs font-semibold mb-3">📱 Config iPhone — Compte email</p>
+              <div className="space-y-1.5 text-xs text-slate-400 font-mono">
+                <div className="flex justify-between"><span className="text-slate-500">Type</span><span>IMAP</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Email</span><span>{imapUser || 'hugo@agentry.fr'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Serveur entrant</span><span>{imapHost || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Port entrant</span><span>{imapPort}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Sécurité</span><span>{imapSecure ? 'SSL/TLS' : 'Aucune / STARTTLS'}</span></div>
+              </div>
+            </div>
+          )}
+        </div>
+        <button type="submit" disabled={imapSaving || !imapHost || !imapUser || !imapPass}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-semibold text-base transition disabled:opacity-50 mb-8">
+          {imapSaving ? 'Test de connexion…' : imapSaved ? '✅ IMAP connecté !' : '🔌 Tester et connecter IMAP'}
         </button>
       </form>
 

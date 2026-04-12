@@ -4,6 +4,54 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { EmailTemplate } from '@/lib/email-templates'
 import type { GmailMessage } from '@/lib/gmail'
 
+// ─── EmailBody — iframe isolé pour éviter les conflits CSS avec les emails HTML ─
+
+function EmailBody({ html }: { html: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [height, setHeight] = useState(300)
+
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) return
+
+    // Injecter le HTML de l'email dans l'iframe avec reset CSS
+    doc.open()
+    doc.write(`<!DOCTYPE html><html><head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        body { margin: 0; padding: 16px; font-family: -apple-system, sans-serif; font-size: 14px; line-height: 1.6; color: #1e293b; background: #fff; word-break: break-word; }
+        img { max-width: 100%; height: auto; }
+        a { color: #4f46e5; }
+        pre, code { white-space: pre-wrap; word-break: break-all; }
+        * { box-sizing: border-box; }
+      </style>
+    </head><body>${html}</body></html>`)
+    doc.close()
+
+    // Adapter la hauteur au contenu
+    const resize = () => {
+      const h = doc.documentElement?.scrollHeight || doc.body?.scrollHeight || 300
+      setHeight(Math.min(h + 32, 800))
+    }
+    iframe.onload = resize
+    setTimeout(resize, 100)
+  }, [html])
+
+  return (
+    <iframe
+      ref={iframeRef}
+      className="w-full rounded-xl border border-slate-700 bg-white"
+      style={{ height, minHeight: 120 }}
+      sandbox="allow-same-origin allow-popups"
+      title="Email content"
+    />
+  )
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function applyVars(text: string, vars: Record<string, string>) {
@@ -514,19 +562,22 @@ ${selectedMsg.body}
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5">
                   {loadingMsg ? (
                     <div className="animate-pulse space-y-3">
                       {[...Array(6)].map((_, i) => (
                         <div key={i} className="h-4 bg-slate-800 rounded" style={{ width: `${60 + Math.random() * 40}%` }} />
                       ))}
                     </div>
+                  ) : selectedMsg.body ? (
+                    <EmailBody html={selectedMsg.body} />
                   ) : (
-                    <div
-                      className="prose prose-sm max-w-none text-slate-200 [&_a]:text-indigo-400 [&_img]:max-w-full [&_*]:!color-inherit"
-                      style={{ fontFamily: 'inherit' }}
-                      dangerouslySetInnerHTML={{ __html: selectedMsg.body || '' }}
-                    />
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-500 text-sm gap-2">
+                      <svg className="w-8 h-8 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Aucun contenu
+                    </div>
                   )}
                 </div>
 
