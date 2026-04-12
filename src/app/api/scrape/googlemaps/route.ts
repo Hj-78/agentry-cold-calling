@@ -12,49 +12,57 @@ interface ScrapeResult {
   website: string
 }
 
-const LOCAL_CHROME_PATHS = [
+const CHROME_CANDIDATES = [
+  // Mac local
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  '/usr/bin/chromium-browser',
+  // Linux system (Railway nixpacks)
   '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/run/current-system/sw/bin/chromium',
 ]
+
+async function findChromium(): Promise<string> {
+  // 1. Var d'env explicite (Railway settings)
+  if (process.env.CHROMIUM_EXECUTABLE_PATH) return process.env.CHROMIUM_EXECUTABLE_PATH
+
+  // 2. Chercher dans les chemins connus
+  const { existsSync } = await import('fs')
+  const found = CHROME_CANDIDATES.find((p) => existsSync(p))
+  if (found) return found
+
+  // 3. Essayer `which chromium` (nix PATH)
+  try {
+    const { execSync } = await import('child_process')
+    const path = execSync('which chromium || which chromium-browser || which google-chrome', {
+      encoding: 'utf-8',
+    }).trim()
+    if (path && existsSync(path)) return path
+  } catch { /* not found in PATH */ }
+
+  throw new Error(
+    'Chromium introuvable. En local: installe Google Chrome. Sur Railway: ajoute nixPkgs = ["chromium"] dans nixpacks.toml'
+  )
+}
 
 async function launchBrowser() {
   const puppeteer = (await import('puppeteer-core')).default
-
-  // En dev local (Mac) : utilise Chrome installé sur la machine
-  if (process.env.NODE_ENV !== 'production' || process.env.CHROMIUM_EXECUTABLE_PATH) {
-    const { existsSync } = await import('fs')
-    const localPath =
-      process.env.CHROMIUM_EXECUTABLE_PATH ||
-      LOCAL_CHROME_PATHS.find((p) => existsSync(p))
-
-    if (!localPath) throw new Error('Chrome non trouvé en local. Installe Google Chrome.')
-
-    return puppeteer.launch({
-      executablePath: localPath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-      defaultViewport: { width: 1280, height: 800 },
-      headless: true,
-    })
-  }
-
-  // En production (Railway) : @sparticuz/chromium — Chromium statiquement lié, zéro dép système
-  const chromium = (await import('@sparticuz/chromium')).default
-  const executablePath = await chromium.executablePath('/tmp/chromium')
+  const executablePath = await findChromium()
 
   return puppeteer.launch({
+    executablePath,
     args: [
-      ...chromium.args,
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--single-process',
-      '--no-zygote',
+      '--headless=new',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--mute-audio',
     ],
     defaultViewport: { width: 1280, height: 800 },
-    executablePath,
     headless: true,
   })
 }
