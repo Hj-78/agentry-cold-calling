@@ -89,6 +89,8 @@ export default function AgencesPage() {
   const [sortKey, setSortKey] = useState<SortKey>('ville')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const searchRef = useRef<HTMLInputElement>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const fetchAgences = async () => {
     const res = await fetch('/api/agences')
@@ -155,8 +157,45 @@ export default function AgencesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Supprimer cette agence ?')) return
     await fetch(`/api/agences?id=${id}`, { method: 'DELETE' })
+    setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
     setExpandedRow(null)
     fetchAgences()
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const ids = Array.from(selectedIds)
+    await fetch(`/api/agences?ids=${ids.join(',')}`, { method: 'DELETE' })
+    setSelectedIds(new Set())
+    setShowDeleteModal(false)
+    setExpandedRow(null)
+    fetchAgences()
+  }
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id); else s.add(id)
+      return s
+    })
+  }
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every(a => selectedIds.has(a.id))
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(prev => {
+        const s = new Set(prev)
+        filtered.forEach(a => s.delete(a.id))
+        return s
+      })
+    } else {
+      setSelectedIds(prev => {
+        const s = new Set(prev)
+        filtered.forEach(a => s.add(a.id))
+        return s
+      })
+    }
   }
 
   const handleMapsSearch = async () => {
@@ -239,6 +278,14 @@ export default function AgencesPage() {
             <h1 className="text-3xl font-bold text-white">Agences</h1>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
+            {selectedIds.size > 0 && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2"
+              >
+                🗑️ Supprimer ({selectedIds.size})
+              </button>
+            )}
             <button
               onClick={() => { setShowForm(!showForm); setEditingId(null); setForm(emptyForm) }}
               className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition"
@@ -420,6 +467,35 @@ export default function AgencesPage() {
         </div>
       )}
 
+      {/* Modale de confirmation suppression groupée */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="text-3xl mb-3 text-center">🗑️</div>
+            <h2 className="text-white font-bold text-lg text-center mb-2">
+              Supprimer {selectedIds.size} agence{selectedIds.size > 1 ? 's' : ''} ?
+            </h2>
+            <p className="text-slate-400 text-sm text-center mb-6">
+              Cette action est irréversible. Les sessions et appels liés à ces agences ne seront pas supprimés.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-medium text-sm transition"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-bold text-sm transition"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TABLE */}
       <div className="flex-1 overflow-auto px-6 pb-8">
         {filtered.length === 0 ? (
@@ -430,7 +506,16 @@ export default function AgencesPage() {
         ) : (
           <div className="rounded-2xl border border-slate-800 overflow-hidden">
             {/* En-tête tableau avec tri */}
-            <div className="grid grid-cols-[2fr_1fr_1fr_80px_auto] bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-10">
+            <div className="grid grid-cols-[40px_2fr_1fr_1fr_80px_auto] bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-10">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+                  title="Tout sélectionner"
+                />
+              </div>
               <SortBtn k="nom" label="Agence" />
               <SortBtn k="ville" label="Ville" />
               <div className="hidden md:flex items-center gap-3">
@@ -452,7 +537,7 @@ export default function AgencesPage() {
                   <div key={agence.id} className={statut.row}>
                     {/* Ligne principale */}
                     <div
-                      className={`grid grid-cols-[2fr_1fr_1fr_80px_auto] items-center px-4 py-3 cursor-pointer hover:bg-white/[0.03] transition ${isExpanded ? 'bg-white/[0.04]' : ''}`}
+                      className={`grid grid-cols-[40px_2fr_1fr_1fr_80px_auto] items-center px-4 py-3 cursor-pointer hover:bg-white/[0.03] transition ${isExpanded ? 'bg-white/[0.04]' : ''} ${selectedIds.has(agence.id) ? 'bg-indigo-950/20' : ''}`}
                       onClick={() => {
                         const newId = isExpanded ? null : agence.id
                         setExpandedRow(newId)
@@ -465,6 +550,16 @@ export default function AgencesPage() {
                         }
                       }}
                     >
+                      {/* Checkbox */}
+                      <div onClick={e => { e.stopPropagation(); toggleSelect(agence.id) }} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(agence.id)}
+                          onChange={() => toggleSelect(agence.id)}
+                          className="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+                        />
+                      </div>
+
                       {/* Nom */}
                       <div className="flex items-center gap-2 min-w-0 pr-2">
                         <span className="text-slate-600 text-xs tabular-nums w-5 flex-shrink-0 hidden md:block">{idx + 1}</span>

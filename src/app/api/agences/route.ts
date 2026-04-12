@@ -83,6 +83,7 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
+  const ids = searchParams.get('ids')
   const ville = searchParams.get('ville')
 
   if (ville) {
@@ -91,7 +92,19 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true, deleted: count })
   }
 
-  await prisma.agence.delete({ where: { id: parseInt(id || '0') } })
-  scheduleBackup()
-  return NextResponse.json({ ok: true })
+  if (ids) {
+    const idArray = ids.split(',').map(Number).filter(n => n > 0)
+    if (idArray.length === 0) return NextResponse.json({ error: 'ids invalides' }, { status: 400 })
+    const { count } = await prisma.agence.deleteMany({ where: { id: { in: idArray } } })
+    scheduleBackup()
+    return NextResponse.json({ ok: true, deleted: count })
+  }
+
+  if (id) {
+    await prisma.agence.delete({ where: { id: parseInt(id) } })
+    scheduleBackup()
+    return NextResponse.json({ ok: true })
+  }
+
+  return NextResponse.json({ error: 'id ou ids requis' }, { status: 400 })
 }

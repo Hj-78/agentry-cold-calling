@@ -99,6 +99,11 @@ export default function ImportPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [parseError, setParseError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Manual mapping fallback (quand auto-détection échoue)
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvRawRows, setCsvRawRows] = useState<Record<string, string>[]>([])
+  const [manualMapping, setManualMapping] = useState<Record<string, keyof ParsedAgence | ''>>({})
+  const [showManualMapping, setShowManualMapping] = useState(false)
 
   // Scrape state
   const [keyword, setKeyword] = useState('agence immobilière')
@@ -114,10 +119,25 @@ export default function ImportPage() {
 
   // ── File parsing ──────────────────────────────────────────────────────────
 
+  const finalizeParsed = (rows: ParsedAgence[]) => {
+    const seen = new Set<string>()
+    let dupes = 0
+    const unique: ParsedAgence[] = []
+    for (const r of rows) {
+      const key = `${r.nom.toLowerCase().trim()}|${r.telephone.replace(/\s/g, '')}`
+      if (seen.has(key)) { dupes++; continue }
+      seen.add(key)
+      unique.push(r)
+    }
+    setDuplicateCount(dupes)
+    setParsed(unique)
+  }
+
   const processFile = useCallback(async (file: File) => {
     setParseError('')
     setImportResult(null)
     setParsed([])
+    setShowManualMapping(false)
     setFileName(file.name)
 
     const ext = file.name.split('.').pop()?.toLowerCase()
@@ -127,12 +147,31 @@ export default function ImportPage() {
 
       if (ext === 'csv') {
         const text = await file.text()
-        const result = Papa.parse<Record<string, string>>(text, {
-          header: true,
-          skipEmptyLines: true,
-          transformHeader: h => h.trim(),
-        })
-        rawRows = result.data
+        // Supprimer le BOM UTF-8 — Google Sheets exporte avec \uFEFF en début de fichier
+        const cleanText = text.replace(/^\uFEFF/, '')
+
+        // Détecter le séparateur : PapaParse auto-détecte, mais si ça donne 1 seule colonne
+        // c'est probablement un CSV avec point-virgule (export français Excel/Sheets)
+        const tryParse = (delimiter?: string) =>
+          Papa.parse<Record<string, string>>(cleanText, {
+            header: true,
+            skipEmptyLines: true,
+            transformHeader: h => h.trim(),
+            ...(delimiter ? { delimiter } : {}),
+          }).data
+
+        const autoRows = tryParse()
+        const colCount = autoRows.length > 0 ? Object.keys(autoRows[0]).length : 0
+
+        if (colCount <= 1) {
+          // Auto-détection a échoué → forcer le point-virgule
+          const semiRows = tryParse(';')
+          rawRows = semiRows.length > 0 && Object.keys(semiRows[0]).length > 1
+            ? semiRows
+            : autoRows
+        } else {
+          rawRows = autoRows
+        }
       } else if (ext === 'xlsx' || ext === 'xls') {
         const buffer = await file.arrayBuffer()
         const wb = XLSX.read(buffer, { type: 'array' })
@@ -144,25 +183,63 @@ export default function ImportPage() {
       }
 
       setRawCount(rawRows.length)
+
+      if (rawRows.length === 0) {
+        setParseError('Le fichier est vide ou ne contient aucune ligne valide.')
+        return
+      }
+
+      const headers = Object.keys(rawRows[0])
+      setCsvHeaders(headers)
+      setCsvRawRows(rawRows)
+
       const { rows, mapping: m } = parseRows(rawRows)
       setMapping(m)
 
-      // Detect duplicates locally (by nom + telephone)
-      const seen = new Set<string>()
-      let dupes = 0
-      const unique: ParsedAgence[] = []
-      for (const r of rows) {
-        const key = `${r.nom.toLowerCase().trim()}|${r.telephone.replace(/\s/g, '')}`
-        if (seen.has(key)) { dupes++; continue }
-        seen.add(key)
-        unique.push(r)
+      // Si la colonne "nom" n'est pas détectée → mapping manuel
+      const hasNom = Object.values(m).includes('nom')
+      if (!hasNom) {
+        const initial: Record<string, keyof ParsedAgence | ''> = {}
+        for (const h of headers) initial[h] = m[h] || ''
+        setManualMapping(initial)
+        setShowManualMapping(true)
+        return
       }
-      setDuplicateCount(dupes)
-      setParsed(unique)
+
+      finalizeParsed(rows)
     } catch (e) {
       setParseError(`Erreur de lecture : ${e instanceof Error ? e.message : 'Inconnue'}`)
     }
   }, [])
+
+  const applyManualMapping = () => {
+    const rows = csvRawRows
+      .map(row => {
+        const result: ParsedAgence = { nom: '', telephone: '', ville: '', adresse: '', horaires: '' }
+        for (const [col, field] of Object.entries(manualMapping)) {
+          if (!field) continue
+          const val = (row[col] || '').toString().trim()
+          if (val && !result[field]) result[field] = val
+        }
+        return result
+      })
+      .filter(r => r.nom.trim())
+
+    if (rows.length === 0) {
+      setParseError('Aucune ligne valide. Assurez-vous d\'assigner la colonne "Nom de l\'agence".')
+      return
+    }
+
+    setParseError('')
+    setShowManualMapping(false)
+    // Reconstruire le mapping affiché depuis les sélections manuelles
+    const resolvedMapping: Record<string, keyof ParsedAgence> = {}
+    for (const [col, field] of Object.entries(manualMapping)) {
+      if (field) resolvedMapping[col] = field
+    }
+    setMapping(resolvedMapping)
+    finalizeParsed(rows)
+  }
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -351,6 +428,53 @@ export default function ImportPage() {
           {parseError && (
             <div className="bg-red-900/30 border border-red-500/50 rounded-2xl px-5 py-4 text-red-400 text-sm">
               ⚠️ {parseError}
+            </div>
+          )}
+
+          {/* Mapping manuel — affiché quand l'auto-détection échoue */}
+          {showManualMapping && csvHeaders.length > 0 && (
+            <div className="bg-slate-900 border border-amber-700/40 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-800 bg-amber-900/10">
+                <p className="text-amber-300 font-semibold text-sm">Colonnes non reconnues automatiquement</p>
+                <p className="text-slate-400 text-xs mt-1">
+                  {rawCount} lignes trouvées · Assignez chaque colonne à un champ CRM
+                </p>
+              </div>
+              <div className="divide-y divide-slate-800">
+                {csvHeaders.map(header => (
+                  <div key={header} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <span className="text-slate-300 text-sm font-mono min-w-0 truncate flex-1">
+                      {header}
+                      {csvRawRows[0]?.[header] && (
+                        <span className="text-slate-600 ml-2 font-sans font-normal">
+                          ex: {String(csvRawRows[0][header]).slice(0, 30)}
+                        </span>
+                      )}
+                    </span>
+                    <select
+                      value={manualMapping[header] || ''}
+                      onChange={e => setManualMapping(prev => ({ ...prev, [header]: e.target.value as keyof ParsedAgence | '' }))}
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 flex-shrink-0 w-44"
+                    >
+                      <option value="">— Ignorer —</option>
+                      <option value="nom">Nom de l'agence ★</option>
+                      <option value="telephone">Téléphone</option>
+                      <option value="ville">Ville</option>
+                      <option value="adresse">Adresse</option>
+                      <option value="horaires">Horaires</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div className="px-5 py-4 border-t border-slate-800">
+                <button
+                  onClick={applyManualMapping}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold text-sm transition"
+                >
+                  Appliquer le mapping →
+                </button>
+                <p className="text-slate-600 text-xs mt-2 text-center">★ Le champ "Nom de l'agence" est obligatoire</p>
+              </div>
             </div>
           )}
 
