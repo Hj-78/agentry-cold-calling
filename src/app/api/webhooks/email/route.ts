@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // Resend Inbound Webhook
-// Payload: { type: "email.received", data: { from, to, subject, html, text, ... } }
-// OR raw format: { from, to, subject, html, text, ... } at root level
+// Payload: { type: "email.received", data: { from, to, subject, email_id, message_id, ... } }
+// NOTE: Resend inbound webhooks do NOT include html/text body — we fetch it via API
 
 function extractField(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const key of keys) {
@@ -17,6 +17,24 @@ function extractField(obj: Record<string, unknown>, ...keys: string[]): string |
     if (cur !== undefined && cur !== null && cur !== '') return String(cur)
   }
   return null
+}
+
+async function fetchEmailBodyFromResend(emailId: string): Promise<{ html: string | null; text: string | null }> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey || !emailId) return { html: null, text: null }
+  try {
+    const res = await fetch(`https://api.resend.com/emails/${emailId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    })
+    if (!res.ok) return { html: null, text: null }
+    const data = await res.json()
+    return {
+      html: data.html || null,
+      text: data.text || null,
+    }
+  } catch {
+    return { html: null, text: null }
+  }
 }
 
 export async function POST(req: Request) {
@@ -50,15 +68,15 @@ export async function POST(req: Request) {
 
     const subject = extractField(data, 'subject') || '(Sans objet)'
 
-    // Email body — try all known Resend field names
-    const bodyHtml = extractField(data,
+    // Email body — try all known Resend field names (may be present in some formats)
+    let bodyHtml = extractField(data,
       'html',
       'html_body',
       'htmlBody',
       'body_html',
       'payload.html',
     )
-    const bodyText = extractField(data,
+    let bodyText = extractField(data,
       'text',
       'text_body',
       'textBody',
@@ -67,9 +85,6 @@ export async function POST(req: Request) {
       'plainText',
       'payload.text',
     )
-
-    console.log('[WEBHOOK EMAIL] html length:', bodyHtml?.length ?? 'null')
-    console.log('[WEBHOOK EMAIL] text length:', bodyText?.length ?? 'null')
 
     // Message ID for dedup
     const messageId = extractField(data,
@@ -80,6 +95,23 @@ export async function POST(req: Request) {
       'headers.Message-Id',
     )
 
+    // Resend email_id (separate from message_id) — used to fetch body via API
+    const resendEmailId = extractField(data, 'email_id')
+
+    console.log('[WEBHOOK EMAIL] html length:', bodyHtml?.length ?? 'null')
+    console.log('[WEBHOOK EMAIL] text length:', bodyText?.length ?? 'null')
+    console.log('[WEBHOOK EMAIL] resendEmailId:', resendEmailId)
+
+    // If no body in payload, fetch from Resend API using email_id
+    if (!bodyHtml && !bodyText && resendEmailId) {
+      console.log('[WEBHOOK EMAIL] fetching body from Resend API...')
+      const fetched = await fetchEmailBodyFromResend(resendEmailId)
+      bodyHtml = fetched.html
+      bodyText = fetched.text
+      console.log('[WEBHOOK EMAIL] fetched html length:', bodyHtml?.length ?? 'null')
+      console.log('[WEBHOOK EMAIL] fetched text length:', bodyText?.length ?? 'null')
+    }
+
     // Parse "John Doe <john@example.com>"
     const fromMatch = from.match(/^"?([^"<]*)"?\s*<(.+?)>$/)
     const fromName = fromMatch ? fromMatch[1].trim() : from
@@ -89,11 +121,11 @@ export async function POST(req: Request) {
     const rawText = bodyText || (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') : '')
     const snippet = rawText.trim().slice(0, 200)
 
-    // Dedup
+    // Dedup — use messageId (email_id from Resend) for deduplication
     if (messageId) {
       const existing = await prisma.emailInbound.findUnique({ where: { messageId } })
       if (existing) {
-        // Si on avait sauvegardé sans body, mettre à jour maintenant
+        // If stored without body, update now
         if (!existing.bodyHtml && !existing.bodyText && (bodyHtml || bodyText)) {
           await prisma.emailInbound.update({
             where: { messageId },

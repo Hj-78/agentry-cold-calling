@@ -20,6 +20,9 @@ export async function GET() {
       from: m.from,
       to: m.to,
       subject: m.subject,
+      hasHtml: !!m.bodyHtml,
+      hasText: !!m.bodyText,
+      snippet: m.snippet,
       receivedAt: m.receivedAt,
     })),
     outbound: outbound.map(m => ({
@@ -30,4 +33,42 @@ export async function GET() {
       sentAt: m.sentAt,
     })),
   })
+}
+
+// POST: backfill missing email bodies from Resend API
+export async function POST() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return NextResponse.json({ error: 'No RESEND_API_KEY' })
+
+  // Find emails without body
+  const emails = await prisma.emailInbound.findMany({
+    where: { bodyHtml: null, bodyText: null, messageId: { not: null } },
+    take: 50,
+  })
+
+  let updated = 0
+  for (const email of emails) {
+    // messageId stored is the email_id from Resend (e.g. "9c30e0d2-...")
+    const emailId = email.messageId
+    if (!emailId) continue
+    try {
+      const res = await fetch(`https://api.resend.com/emails/${emailId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+      if (!res.ok) continue
+      const data = await res.json()
+      const bodyHtml = data.html || null
+      const bodyText = data.text || null
+      if (!bodyHtml && !bodyText) continue
+      const rawText = bodyText || (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') : '')
+      const snippet = rawText.trim().slice(0, 200)
+      await prisma.emailInbound.update({
+        where: { id: email.id },
+        data: { bodyHtml, bodyText, snippet },
+      })
+      updated++
+    } catch { /* skip */ }
+  }
+
+  return NextResponse.json({ updated, total: emails.length })
 }
