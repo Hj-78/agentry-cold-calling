@@ -7,8 +7,8 @@ import type { GmailMessage } from '@/lib/gmail'
 // ─── Constantes comptes ────────────────────────────────────────────────────
 
 const ACCOUNTS = [
-  { id: 'primary',   email: 'hugo@contact.agentry.fr', label: 'Contact',   color: 'bg-violet-600' },
-  { id: 'secondary', email: 'hugo@agentry.fr',          label: 'Agentry',   color: 'bg-indigo-600' },
+  { id: 'primary',   email: 'hugo@agentry.fr',         label: 'Agentry',  color: 'bg-violet-600' },
+  { id: 'secondary', email: 'hugo.contact@agentry.fr', label: 'Contact',  color: 'bg-indigo-600' },
 ] as const
 type AccountId = 'primary' | 'secondary'
 

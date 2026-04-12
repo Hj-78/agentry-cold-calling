@@ -2,12 +2,13 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 import { createRdvWithMeet } from '@/lib/google-calendar'
 
-// Adresses vérifiées dans Resend
+// primary → Resend (agentry.fr), secondary → Hostinger SMTP (contact.agentry.fr)
 const ADDRESSES = {
-  primary: { email: 'hugo@contact.agentry.fr', display: 'Hugo — Agentry <hugo@contact.agentry.fr>' },
-  secondary: { email: 'hugo@agentry.fr', display: 'Hugo — Agentry <hugo@agentry.fr>' },
+  primary: { email: 'hugo@agentry.fr', display: 'Hugo — Agentry <hugo@agentry.fr>' },
+  secondary: { email: 'hugo.contact@agentry.fr', display: 'Hugo — Agentry <hugo.contact@agentry.fr>' },
 }
 
 export async function POST(req: Request) {
@@ -61,18 +62,42 @@ export async function POST(req: Request) {
     icsAttachment = { filename: 'rendez-vous-agentry.ics', content: Buffer.from(icsContent).toString('base64') }
   }
 
-  const resend = new Resend(resendKey)
-  try {
-    const { error } = await resend.emails.send({
-      from: fromAddress,
-      to,
-      subject,
-      html,
-      ...(icsAttachment ? { attachments: [icsAttachment] } : {}),
-    })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+  // Send via Hostinger SMTP for secondary account, Resend for primary
+  if (fromAccount === 'secondary') {
+    const smtpUser = process.env.HOSTINGER_SMTP_USER || 'hugo.contact@agentry.fr'
+    const smtpPass = process.env.HOSTINGER_SMTP_PASS
+    if (!smtpPass) return NextResponse.json({ error: 'HOSTINGER_SMTP_PASS non configuré' }, { status: 500 })
+    try {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.hostinger.com',
+        port: 587,
+        secure: false,
+        auth: { user: smtpUser, pass: smtpPass },
+      })
+      await transporter.sendMail({
+        from: fromAddress,
+        to,
+        subject,
+        html,
+        ...(icsAttachment ? { attachments: [{ filename: icsAttachment.filename, content: Buffer.from(icsAttachment.content, 'base64') }] } : {}),
+      })
+    } catch (err) {
+      return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
+  } else {
+    const resend = new Resend(resendKey)
+    try {
+      const { error } = await resend.emails.send({
+        from: fromAddress,
+        to,
+        subject,
+        html,
+        ...(icsAttachment ? { attachments: [icsAttachment] } : {}),
+      })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    } catch (err) {
+      return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
   }
 
   try {

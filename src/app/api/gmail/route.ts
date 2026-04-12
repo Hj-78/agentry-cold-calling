@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 const ACCOUNT_EMAILS: Record<string, string> = {
-  primary: 'hugo@contact.agentry.fr',
-  secondary: 'hugo@agentry.fr',
+  primary: 'hugo@agentry.fr',
+  secondary: 'hugo.contact@agentry.fr',
 }
 
 export async function GET(req: Request) {
