@@ -149,29 +149,37 @@ export default function ImportPage() {
         const text = await file.text()
         // Supprimer le BOM UTF-8 — Google Sheets exporte avec \uFEFF en début de fichier
         const cleanText = text.replace(/^\uFEFF/, '')
+        const lines = cleanText.split('\n').filter(l => l.trim())
 
-        // Détecter le séparateur : PapaParse auto-détecte, mais si ça donne 1 seule colonne
-        // c'est probablement un CSV avec point-virgule (export français Excel/Sheets)
-        const tryParse = (delimiter?: string) =>
-          Papa.parse<Record<string, string>>(cleanText, {
+        // Essayer toutes les combinaisons : (skip 0 ou 1 ligne) × (auto, ',', ';', '\t')
+        // et prendre celle qui donne le plus de colonnes sans __parsed_extra
+        const parse = (src: string, delimiter?: string) =>
+          Papa.parse<Record<string, string>>(src, {
             header: true,
             skipEmptyLines: true,
             transformHeader: h => h.trim(),
-            ...(delimiter ? { delimiter } : {}),
+            ...(delimiter !== undefined ? { delimiter } : {}),
           }).data
 
-        const autoRows = tryParse()
-        const colCount = autoRows.length > 0 ? Object.keys(autoRows[0]).length : 0
-
-        if (colCount <= 1) {
-          // Auto-détection a échoué → forcer le point-virgule
-          const semiRows = tryParse(';')
-          rawRows = semiRows.length > 0 && Object.keys(semiRows[0]).length > 1
-            ? semiRows
-            : autoRows
-        } else {
-          rawRows = autoRows
+        const score = (rows: Record<string, string>[]) => {
+          if (!rows.length) return -1
+          const keys = Object.keys(rows[0])
+          const hasExtra = keys.includes('__parsed_extra')
+          return (hasExtra ? 0 : keys.length) * rows.length
         }
+
+        const candidates: Record<string, string>[][] = []
+        for (const skip of [0, 1]) {
+          if (skip >= lines.length) continue
+          const src = lines.slice(skip).join('\n')
+          for (const delim of [undefined, ',', ';', '\t']) {
+            candidates.push(parse(src, delim))
+          }
+        }
+
+        rawRows = candidates.reduce((best, cur) =>
+          score(cur) > score(best) ? cur : best
+        , [])
       } else if (ext === 'xlsx' || ext === 'xls') {
         const buffer = await file.arrayBuffer()
         const wb = XLSX.read(buffer, { type: 'array' })

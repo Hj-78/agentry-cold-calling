@@ -550,13 +550,13 @@ export default function AgencesPage() {
                         }
                       }}
                     >
-                      {/* Checkbox */}
+                      {/* Checkbox — onClick sur le div, onChange vide pour éviter le double-toggle */}
                       <div onClick={e => { e.stopPropagation(); toggleSelect(agence.id) }} className="flex items-center">
                         <input
                           type="checkbox"
                           checked={selectedIds.has(agence.id)}
-                          onChange={() => toggleSelect(agence.id)}
-                          className="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+                          onChange={() => {}}
+                          className="w-4 h-4 rounded accent-indigo-500 cursor-pointer pointer-events-none"
                         />
                       </div>
 
