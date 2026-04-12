@@ -12,14 +12,38 @@ interface ScrapeResult {
   website: string
 }
 
+const LOCAL_CHROME_PATHS = [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/chromium',
+]
+
 async function launchBrowser() {
-  // Use @sparticuz/chromium — statically linked, no system deps needed (works on Railway)
-  const chromium = (await import('@sparticuz/chromium')).default
   const puppeteer = (await import('puppeteer-core')).default
 
-  const executablePath = await chromium.executablePath()
+  // En dev local (Mac) : utilise Chrome installé sur la machine
+  if (process.env.NODE_ENV !== 'production' || process.env.CHROMIUM_EXECUTABLE_PATH) {
+    const { existsSync } = await import('fs')
+    const localPath =
+      process.env.CHROMIUM_EXECUTABLE_PATH ||
+      LOCAL_CHROME_PATHS.find((p) => existsSync(p))
 
-  const browser = await puppeteer.launch({
+    if (!localPath) throw new Error('Chrome non trouvé en local. Installe Google Chrome.')
+
+    return puppeteer.launch({
+      executablePath: localPath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      defaultViewport: { width: 1280, height: 800 },
+      headless: true,
+    })
+  }
+
+  // En production (Railway) : @sparticuz/chromium — Chromium statiquement lié, zéro dép système
+  const chromium = (await import('@sparticuz/chromium')).default
+  const executablePath = await chromium.executablePath('/tmp/chromium')
+
+  return puppeteer.launch({
     args: [
       ...chromium.args,
       '--no-sandbox',
@@ -33,8 +57,6 @@ async function launchBrowser() {
     executablePath,
     headless: true,
   })
-
-  return browser
 }
 
 async function scrapeGoogleMaps(keyword: string, city: string): Promise<ScrapeResult[]> {
