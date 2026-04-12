@@ -87,7 +87,8 @@ export default function EmailsPage() {
   const [unreadCount, setUnreadCount] = useState(0)
 
   // Compte actif
-  const [activeAccount, setActiveAccount] = useState<AccountId>('primary')
+  const [activeAccount, setActiveAccount] = useState<AccountId>('secondary')
+  const [accountUnread, setAccountUnread] = useState<Record<AccountId, number>>({ primary: 0, secondary: 0 })
 
   // Compose
   const [agences, setAgences] = useState<Agence[]>([])
@@ -129,8 +130,13 @@ export default function EmailsPage() {
     p.set('account', acc)
     const res = await fetch(`/api/gmail?${p}`)
     const data = await res.json()
-    setMessages(data.messages || [])
-    setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
+    const msgs = data.messages || []
+    setMessages(msgs)
+    const unread = msgs.filter((m: GmailMessage) => !m.isRead).length
+    setUnreadCount(unread)
+    if (folder === 'inbox') {
+      setAccountUnread(prev => ({ ...prev, [acc]: unread }))
+    }
     setLoadingList(false)
   }, [activeAccount])
 
@@ -151,8 +157,18 @@ export default function EmailsPage() {
   useEffect(() => {
     fetch('/api/agences').then(r => r.json()).then(setAgences)
     fetch('/api/email-templates').then(r => r.json()).then(setTemplates)
-    // Sync IMAP then load messages
-    fetch('/api/imap/sync', { method: 'POST' }).then(() => loadMessages('inbox', undefined, 'primary'))
+    // Fetch unread counts for both accounts
+    Promise.all([
+      fetch('/api/gmail?folder=inbox&account=primary').then(r => r.json()),
+      fetch('/api/gmail?folder=inbox&account=secondary').then(r => r.json()),
+    ]).then(([pData, sData]) => {
+      setAccountUnread({
+        primary: (pData.messages || []).filter((m: GmailMessage) => !m.isRead).length,
+        secondary: (sData.messages || []).filter((m: GmailMessage) => !m.isRead).length,
+      })
+    }).catch(() => {})
+    // Sync IMAP then load messages for secondary (where emails actually arrive)
+    fetch('/api/imap/sync', { method: 'POST' }).then(() => loadMessages('inbox', undefined, 'secondary'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -305,7 +321,10 @@ export default function EmailsPage() {
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs transition mb-0.5 ${activeAccount === acc.id ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'}`}>
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${acc.color}`} />
               <span className="truncate">{acc.email}</span>
-              {acc.id === 'primary' && <span className="ml-auto text-[9px] bg-violet-600/30 text-violet-400 px-1.5 py-0.5 rounded-full font-medium">principal</span>}
+              {accountUnread[acc.id as AccountId] > 0
+                ? <span className="ml-auto bg-violet-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[16px] text-center">{accountUnread[acc.id as AccountId]}</span>
+                : acc.id === 'primary' && <span className="ml-auto text-[9px] bg-violet-600/30 text-violet-400 px-1.5 py-0.5 rounded-full font-medium">principal</span>
+              }
             </button>
           ))}
         </div>
