@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
 
@@ -11,6 +12,184 @@ interface ScrapeResult {
   website: string
 }
 
+async function launchBrowser() {
+  // Use @sparticuz/chromium — statically linked, no system deps needed (works on Railway)
+  const chromium = (await import('@sparticuz/chromium')).default
+  const puppeteer = (await import('puppeteer-core')).default
+
+  const executablePath = await chromium.executablePath()
+
+  const browser = await puppeteer.launch({
+    args: [
+      ...chromium.args,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process',
+      '--no-zygote',
+    ],
+    defaultViewport: { width: 1280, height: 800 },
+    executablePath,
+    headless: true,
+  })
+
+  return browser
+}
+
+async function scrapeGoogleMaps(keyword: string, city: string): Promise<ScrapeResult[]> {
+  const browser = await launchBrowser()
+
+  try {
+    const page = await browser.newPage()
+
+    // Bloc anti-bot basique
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    )
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'fr-FR,fr;q=0.9' })
+
+    // Aller sur Google Maps
+    const query = encodeURIComponent(`${keyword} ${city}`)
+    await page.goto(`https://www.google.com/maps/search/${query}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    })
+
+    // Accepter les cookies RGPD si présents
+    try {
+      await page.waitForSelector('button[aria-label], form button', { timeout: 4000 })
+      const buttons = await page.$$('button')
+      for (const btn of buttons) {
+        const txt = await btn.evaluate((el) => el.textContent?.toLowerCase() || '')
+        if (txt.includes('accept') || txt.includes('tout accepter') || txt.includes('tout refuser')) {
+          await btn.click()
+          break
+        }
+      }
+      await new Promise((r) => setTimeout(r, 1500))
+    } catch {
+      /* pas de dialog cookie */
+    }
+
+    // Attendre la liste de résultats
+    try {
+      await page.waitForSelector('[role="feed"] a[href*="/maps/place/"], a[href*="/maps/place/"]', {
+        timeout: 15000,
+      })
+    } catch {
+      return []
+    }
+
+    // Scroll pour charger plus de résultats
+    await page.evaluate(() => {
+      const feed = document.querySelector('[role="feed"]')
+      if (feed) feed.scrollTop = 9999
+    })
+    await new Promise((r) => setTimeout(r, 2000))
+
+    // Récupérer les liens des résultats
+    const resultLinks: { href: string; nom: string; adresse: string }[] = await page.evaluate(() => {
+      const seen = new Set<string>()
+      const items: { href: string; nom: string; adresse: string }[] = []
+
+      document.querySelectorAll('a[href*="/maps/place/"]').forEach((a) => {
+        const href = (a as HTMLAnchorElement).href
+        if (!href || seen.has(href)) return
+        seen.add(href)
+
+        // Chercher le nom dans les enfants
+        const nameEl =
+          a.querySelector('.fontHeadlineSmall') ||
+          a.querySelector('.qBF1Pd') ||
+          a.querySelector('[class*="fontHeadline"]')
+        const nom =
+          nameEl?.textContent?.trim() ||
+          (a as HTMLAnchorElement).getAttribute('aria-label') ||
+          ''
+
+        // Adresse: spans après le nom dans les blocs d'info
+        const infoEls = a.querySelectorAll('.W4Efsd span, .UsdlK span')
+        const adresse = Array.from(infoEls)
+          .map((el) => el.textContent?.trim())
+          .filter(Boolean)
+          .join(', ')
+          .slice(0, 100)
+
+        if (nom) items.push({ href, nom, adresse })
+      })
+
+      return items.slice(0, 12)
+    })
+
+    if (resultLinks.length === 0) return []
+
+    // Visiter chaque résultat pour récupérer le téléphone
+    const results: ScrapeResult[] = []
+
+    for (const link of resultLinks) {
+      try {
+        await page.goto(link.href, { waitUntil: 'domcontentloaded', timeout: 15000 })
+        await new Promise((r) => setTimeout(r, 1000))
+
+        const details = await page.evaluate(() => {
+          // Téléphone
+          let telephone = ''
+          const telLink = document.querySelector('a[href^="tel:"]') as HTMLAnchorElement | null
+          if (telLink) telephone = telLink.href.replace('tel:', '')
+          if (!telephone) {
+            const telBtn = document.querySelector('[data-item-id^="phone:tel:"]') as HTMLElement | null
+            if (telBtn) telephone = telBtn.getAttribute('data-item-id')?.replace('phone:tel:', '') || ''
+          }
+
+          // Adresse
+          let adresse = ''
+          const addrBtn = document.querySelector('[data-item-id="address"]') as HTMLElement | null
+          if (addrBtn) adresse = addrBtn.textContent?.trim() || ''
+
+          // Horaires
+          let horaires = ''
+          const hoursEl =
+            document.querySelector('[aria-label*="horaire"], [aria-label*="Ouvert"], [aria-label*="Fermé"]') as HTMLElement | null
+          if (hoursEl) horaires = hoursEl.getAttribute('aria-label') || ''
+
+          // Site web
+          let website = ''
+          const webLink = document.querySelector('a[data-item-id="authority"]') as HTMLAnchorElement | null
+          if (webLink) website = webLink.href || ''
+
+          return { telephone, adresse, horaires, website }
+        })
+
+        results.push({
+          nom: link.nom,
+          telephone: details.telephone || '',
+          adresse: details.adresse || link.adresse || '',
+          ville: city,
+          horaires: details.horaires || '',
+          website: details.website || '',
+        })
+      } catch {
+        // Garder quand même le résultat sans détails
+        results.push({
+          nom: link.nom,
+          telephone: '',
+          adresse: link.adresse || '',
+          ville: city,
+          horaires: '',
+          website: '',
+        })
+      }
+
+      await new Promise((r) => setTimeout(r, 400))
+    }
+
+    return results
+  } finally {
+    await browser.close()
+  }
+}
+
 export async function POST(req: Request) {
   const { keyword = 'agence immobilière', city } = await req.json()
 
@@ -18,66 +197,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Ville requise' }, { status: 400 })
   }
 
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Clé GOOGLE_PLACES_API_KEY manquante' }, { status: 400 })
-  }
-
   try {
-    const query = `${keyword} ${city}`
-    const searchParams = new URLSearchParams({ query, key: apiKey, language: 'fr' })
-    const searchRes = await fetch(
-      `https://maps.googleapis.com/maps/api/place/textsearch/json?${searchParams}`
-    )
-    const searchData = await searchRes.json()
-
-    if (searchData.status !== 'OK' && searchData.status !== 'ZERO_RESULTS') {
-      return NextResponse.json(
-        { error: `Google Places: ${searchData.error_message || searchData.status}` },
-        { status: 400 }
-      )
-    }
-
-    const places = (searchData.results || []).slice(0, 20)
-    const results: ScrapeResult[] = []
-
-    for (const place of places) {
-      try {
-        const detailRes = await fetch(
-          `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,opening_hours,website&key=${apiKey}&language=fr`
-        )
-        const detail = await detailRes.json()
-        const r = detail.result || {}
-
-        const adresse = r.formatted_address || place.formatted_address || ''
-        // Extract city from address (last part after last comma)
-        let ville = city
-        const adresseParts = adresse.split(',')
-        if (adresseParts.length >= 2) {
-          const lastPart = adresseParts[adresseParts.length - 1].trim()
-          const cityMatch = lastPart.match(/\d{5}\s+(.+)/)
-          if (cityMatch) ville = cityMatch[1].trim()
-        }
-
-        // Format opening hours
-        const horaires = (r.opening_hours?.weekday_text || []).join(' | ').slice(0, 300)
-
-        results.push({
-          nom: (r.name || place.name || '').trim(),
-          telephone: (r.formatted_phone_number || '').replace(/\s/g, ' ').trim(),
-          adresse: adresse.trim(),
-          ville: ville.trim(),
-          horaires: horaires,
-          website: (r.website || '').trim(),
-        })
-      } catch { /* skip this place */ }
-    }
-
+    const results = await scrapeGoogleMaps(keyword, city)
     return NextResponse.json({ results, total: results.length })
   } catch (err) {
-    console.error('[SCRAPE] Error:', err)
+    console.error('[SCRAPE MAPS] Error:', err)
     return NextResponse.json(
-      { error: `Erreur: ${err instanceof Error ? err.message : 'Inconnue'}` },
+      { error: `Erreur scraping: ${err instanceof Error ? err.message : 'Inconnue'}` },
       { status: 500 }
     )
   }
