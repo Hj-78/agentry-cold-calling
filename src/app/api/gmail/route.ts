@@ -2,11 +2,18 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+const ACCOUNT_EMAILS: Record<string, string> = {
+  primary: 'hugo@contact.agentry.fr',
+  secondary: 'hugo@agentry.fr',
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const folder = searchParams.get('folder') || 'inbox'
   const q = searchParams.get('q') || ''
   const max = parseInt(searchParams.get('max') || '50')
+  const accountId = searchParams.get('account') || 'primary'
+  const accountEmail = ACCOUNT_EMAILS[accountId] || ACCOUNT_EMAILS.primary
 
   try {
     if (folder === 'sent') {
@@ -14,6 +21,7 @@ export async function GET(req: Request) {
       const sent = await prisma.emailOutbound.findMany({
         orderBy: { sentAt: 'desc' },
         take: max,
+        where: { from: accountEmail },
       })
       const messages = sent.map(m => ({
         id: String(m.id),
@@ -38,13 +46,18 @@ export async function GET(req: Request) {
     const received = await prisma.emailInbound.findMany({
       orderBy: { receivedAt: 'desc' },
       take: max,
-      where: q ? {
-        OR: [
-          { subject: { contains: q } },
-          { fromName: { contains: q } },
-          { fromEmail: { contains: q } },
+      where: {
+        AND: [
+          { to: { contains: accountEmail } },
+          ...(q ? [{
+            OR: [
+              { subject: { contains: q } },
+              { fromName: { contains: q } },
+              { fromEmail: { contains: q } },
+            ],
+          }] : []),
         ],
-      } : undefined,
+      },
     })
 
     const messages = received.map(m => ({
