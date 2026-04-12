@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
+import { getImapConfig } from '@/lib/imap'
 import { createRdvWithMeet } from '@/lib/google-calendar'
 
 // primary → Resend (agentry.fr), secondary → Hostinger SMTP (contact.agentry.fr)
@@ -64,9 +65,10 @@ export async function POST(req: Request) {
 
   // Send via Hostinger SMTP for secondary account, Resend for primary
   if (fromAccount === 'secondary') {
-    const smtpUser = process.env.HOSTINGER_SMTP_USER || 'hugo.contact@agentry.fr'
-    const smtpPass = process.env.HOSTINGER_SMTP_PASS
-    if (!smtpPass) return NextResponse.json({ error: 'HOSTINGER_SMTP_PASS non configuré' }, { status: 500 })
+    const imapCfg = await getImapConfig()
+    if (!imapCfg) return NextResponse.json({ error: 'IMAP non configuré (nécessaire pour SMTP Hostinger)' }, { status: 500 })
+    const smtpUser = imapCfg.user
+    const smtpPass = imapCfg.pass
     try {
       const transporter = nodemailer.createTransport({
         host: 'smtp.hostinger.com',
