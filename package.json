@@ -6,6 +6,7 @@
     "dev": "next dev -H 0.0.0.0",
     "build": "prisma generate && next build",
     "start": "prisma db push && node prisma/seed.js && next start",
+    "postinstall": "playwright install chromium --with-deps || true",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
