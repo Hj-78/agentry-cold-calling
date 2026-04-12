@@ -141,7 +141,7 @@ export async function POST() {
                 data: {
                   messageId,
                   from: f?.address || config.user,
-                  to: t?.address || parsed.to?.text || '',
+                  to: t?.address || (Array.isArray(parsed.to) ? parsed.to[0]?.text : parsed.to?.text) || '',
                   toName: '',
                   subject: parsed.subject || '(Sans objet)',
                   bodyHtml: bodyHtml || `<pre>${parsed.text || ''}</pre>`,
