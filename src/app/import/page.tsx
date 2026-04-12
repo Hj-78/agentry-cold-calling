@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 
@@ -103,12 +103,14 @@ export default function ImportPage() {
   // Scrape state
   const [keyword, setKeyword] = useState('agence immobilière')
   const [scrapeCity, setScrapeCity] = useState('')
+  const [maxResults, setMaxResults] = useState(15)
   const [scraping, setScraping] = useState(false)
   const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([])
   const [scrapeStatus, setScrapeStatus] = useState('')
   const [scrapeError, setScrapeError] = useState('')
   const [scrapeImporting, setScrapeImporting] = useState(false)
   const [scrapeImportResult, setScrapeImportResult] = useState<ImportResult | null>(null)
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking')
 
   // ── File parsing ──────────────────────────────────────────────────────────
 
@@ -204,32 +206,53 @@ export default function ImportPage() {
     setImporting(false)
   }
 
+  // ── Serveur local ─────────────────────────────────────────────────────────
+
+  const checkServerStatus = useCallback(async () => {
+    setServerStatus('checking')
+    try {
+      const res = await fetch('http://localhost:3333/health', {
+        signal: AbortSignal.timeout(3000),
+      })
+      setServerStatus(res.ok ? 'online' : 'offline')
+    } catch {
+      setServerStatus('offline')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'scrape') checkServerStatus()
+  }, [tab, checkServerStatus])
+
   // ── Scraping ──────────────────────────────────────────────────────────────
 
   const handleScrape = async () => {
-    if (!scrapeCity.trim()) return
+    if (!scrapeCity.trim() || serverStatus !== 'online') return
     setScraping(true)
     setScrapeResults([])
     setScrapeError('')
-    setScrapeStatus('Lancement du scraping…')
+    setScrapeStatus('Scraping en cours… (peut prendre 1 à 2 minutes)')
     setScrapeImportResult(null)
 
     try {
-      const res = await fetch('/api/scrape/googlemaps', {
+      const res = await fetch('http://localhost:3333/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: keyword.trim(), city: scrapeCity.trim() }),
+        body: JSON.stringify({ keyword: keyword.trim(), city: scrapeCity.trim(), maxResults }),
       })
       const data = await res.json()
       if (!res.ok) {
         setScrapeError(data.error || 'Erreur scraping')
+        setScrapeStatus('')
+      } else if (data.message && (!data.results || data.results.length === 0)) {
+        setScrapeError(data.message)
         setScrapeStatus('')
       } else {
         setScrapeResults(data.results || [])
         setScrapeStatus(`${(data.results || []).length} résultats trouvés`)
       }
     } catch (e) {
-      setScrapeError(`Erreur : ${e instanceof Error ? e.message : 'Inconnue'}`)
+      setScrapeError(`Impossible de joindre le serveur local. Vérifiez qu'il tourne : npm run scraper`)
       setScrapeStatus('')
     }
     setScraping(false)
@@ -437,6 +460,46 @@ export default function ImportPage() {
       {tab === 'scrape' && (
         <div className="space-y-5">
 
+          {/* Statut du serveur local */}
+          <div className={`rounded-2xl px-5 py-4 flex items-center justify-between gap-3 ${
+            serverStatus === 'online'
+              ? 'bg-green-900/20 border border-green-700/40'
+              : serverStatus === 'offline'
+              ? 'bg-red-900/20 border border-red-700/40'
+              : 'bg-slate-900 border border-slate-800'
+          }`}>
+            <div className="flex items-center gap-3">
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                serverStatus === 'online' ? 'bg-green-400' :
+                serverStatus === 'offline' ? 'bg-red-400' : 'bg-slate-500 animate-pulse'
+              }`} />
+              <div>
+                {serverStatus === 'online' && (
+                  <>
+                    <p className="text-green-300 text-sm font-semibold">Serveur local actif</p>
+                    <p className="text-slate-500 text-xs">http://localhost:3333 — prêt à scraper</p>
+                  </>
+                )}
+                {serverStatus === 'offline' && (
+                  <>
+                    <p className="text-red-300 text-sm font-semibold">Serveur local inactif</p>
+                    <p className="text-slate-400 text-xs">Dans un terminal : <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">npm run scraper</code></p>
+                  </>
+                )}
+                {serverStatus === 'checking' && (
+                  <p className="text-slate-400 text-sm">Vérification du serveur local…</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={checkServerStatus}
+              className="text-slate-500 hover:text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700 hover:border-slate-600 transition flex-shrink-0"
+            >
+              Vérifier
+            </button>
+          </div>
+
+          {/* Formulaire */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <h2 className="text-white font-semibold">🗺 Scraper Google Maps</h2>
             <p className="text-slate-500 text-sm">Récupère automatiquement les agences immobilières d'une ville depuis Google Maps, sans API payante.</p>
@@ -452,20 +515,35 @@ export default function ImportPage() {
               />
             </div>
 
-            <div>
-              <label className="text-slate-400 text-sm block mb-2">Ville *</label>
-              <input
-                type="text"
-                value={scrapeCity}
-                onChange={e => setScrapeCity(e.target.value)}
-                placeholder="ex: Paris, Lyon, Bordeaux…"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-base focus:outline-none focus:border-indigo-500 min-h-[48px]"
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className="text-slate-400 text-sm block mb-2">Ville *</label>
+                <input
+                  type="text"
+                  value={scrapeCity}
+                  onChange={e => setScrapeCity(e.target.value)}
+                  placeholder="ex: Paris, Lyon, Bordeaux…"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-base focus:outline-none focus:border-indigo-500 min-h-[48px]"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-sm block mb-2">Nb max</label>
+                <select
+                  value={maxResults}
+                  onChange={e => setMaxResults(parseInt(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-3 text-white text-base focus:outline-none focus:border-indigo-500 min-h-[48px]"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                </select>
+              </div>
             </div>
 
             <button
               onClick={handleScrape}
-              disabled={scraping || !scrapeCity.trim()}
+              disabled={scraping || !scrapeCity.trim() || serverStatus !== 'online'}
               className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-4 rounded-xl font-bold text-base transition min-h-[56px] flex items-center justify-center gap-2"
             >
               {scraping ? (
@@ -474,8 +552,10 @@ export default function ImportPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Scraping en cours…
+                  Scraping en cours… (1-2 min)
                 </>
+              ) : serverStatus === 'offline' ? (
+                '⚠️ Démarrez le serveur local d\'abord'
               ) : (
                 '🔍 Lancer le scraping'
               )}
@@ -483,6 +563,12 @@ export default function ImportPage() {
 
             {scrapeStatus && !scraping && (
               <p className="text-green-400 text-sm text-center">{scrapeStatus}</p>
+            )}
+
+            {scraping && (
+              <p className="text-slate-400 text-sm text-center animate-pulse">
+                Navigation sur Google Maps… chaque fiche prend ~2s
+              </p>
             )}
           </div>
 
@@ -497,7 +583,7 @@ export default function ImportPage() {
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
                 <span className="text-white font-semibold">{scrapeResults.length} résultats</span>
-                <span className="text-slate-500 text-xs">Aperçu</span>
+                <span className="text-slate-500 text-xs">Aperçu avant import</span>
               </div>
 
               <div className="divide-y divide-slate-800 max-h-80 overflow-y-auto">
@@ -507,8 +593,10 @@ export default function ImportPage() {
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                       {r.ville && <span className="text-slate-500 text-xs">{r.ville}</span>}
                       {r.telephone && <span className="text-indigo-400 text-xs">{r.telephone}</span>}
+                      {r.website && <span className="text-slate-600 text-xs truncate max-w-[160px]">{r.website}</span>}
                     </div>
                     {r.adresse && <p className="text-slate-600 text-xs mt-0.5 truncate">{r.adresse}</p>}
+                    {r.horaires && <p className="text-slate-700 text-xs mt-0.5 truncate">{r.horaires}</p>}
                   </div>
                 ))}
               </div>
@@ -538,9 +626,14 @@ export default function ImportPage() {
             </div>
           )}
 
-          <div className="bg-amber-900/20 border border-amber-700/30 rounded-2xl px-5 py-4">
-            <p className="text-amber-300 text-sm font-semibold mb-1">⚠️ Note</p>
-            <p className="text-slate-400 text-sm">Le scraping utilise un navigateur headless. Il peut prendre 30 à 60 secondes selon la ville. Respecte un délai minimum entre chaque action pour éviter le blocage.</p>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl px-5 py-4">
+            <p className="text-slate-500 text-xs font-semibold mb-2 uppercase tracking-wide">Comment ça marche</p>
+            <ol className="text-slate-500 text-xs space-y-1 list-decimal list-inside">
+              <li>Démarrez le serveur local dans un terminal : <code className="text-amber-300">npm run scraper</code></li>
+              <li>Saisissez un mot-clé et une ville, lancez le scraping</li>
+              <li>Le scraping tourne sur votre Mac (Playwright + Chromium)</li>
+              <li>Les résultats s'affichent en aperçu, puis importez dans le CRM</li>
+            </ol>
           </div>
         </div>
       )}

@@ -405,7 +405,7 @@ export default function EmailsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-600 truncate">{msg.snippet}</span>
                         {/* Badge adresse */}
-                        {msg.to && ACCOUNTS.map(a => a.email).includes(msg.to) && (
+                        {msg.to && (ACCOUNTS.map(a => a.email) as string[]).includes(msg.to) && (
                           <span className={`flex-shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full ${msg.to === 'hugo@contact.agentry.fr' ? 'bg-violet-600/20 text-violet-400' : 'bg-indigo-600/20 text-indigo-400'}`}>
                             {msg.to === 'hugo@contact.agentry.fr' ? 'contact' : 'agentry'}
                           </span>

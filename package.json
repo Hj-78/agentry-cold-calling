@@ -8,7 +8,8 @@
     "start": "prisma db push && node prisma/seed.js && next start",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "scraper": "/Users/hugojalta/.local/node-v20.11.0-darwin-arm64/bin/node scraper-server.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -43,6 +44,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
+    "playwright": "^1.44.0",
     "postcss": "^8",
     "prisma": "^5.20.0",
     "tailwindcss": "^3.4.1",
