@@ -13,9 +13,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       if (!m) return NextResponse.json({ error: 'Not found' }, { status: 404 })
       return NextResponse.json({
         id: String(m.id),
-        from: 'hugo@agentry.fr',
+        from: m.from,
         fromName: 'Hugo — Agentry',
-        fromEmail: 'hugo@agentry.fr',
+        fromEmail: m.from,
         to: m.to,
         subject: m.subject,
         snippet: '',

@@ -17,9 +17,9 @@ export async function GET(req: Request) {
       })
       const messages = sent.map(m => ({
         id: String(m.id),
-        from: 'hugo@agentry.fr',
+        from: m.from,
         fromName: 'Hugo — Agentry',
-        fromEmail: 'hugo@agentry.fr',
+        fromEmail: m.from,
         to: m.to,
         subject: m.subject,
         snippet: m.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150),

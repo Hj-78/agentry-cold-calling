@@ -98,6 +98,7 @@ model EmailInbound {
 
 model EmailOutbound {
   id         Int      @id @default(autoincrement())
+  from       String   @default("hugo@contact.agentry.fr")
   to         String
   toName     String   @default("")
   subject    String
