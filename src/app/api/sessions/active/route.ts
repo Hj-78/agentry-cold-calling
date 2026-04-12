@@ -10,6 +10,6 @@ export async function GET() {
   if (!session) return NextResponse.json(null)
   return NextResponse.json({
     ...session,
-    agenceQueue: session.agenceQueue ? JSON.parse(session.agenceQueue) : null,
+    agenceQueue: (() => { try { return session.agenceQueue ? JSON.parse(session.agenceQueue) : null } catch { return null } })(),
   })
 }

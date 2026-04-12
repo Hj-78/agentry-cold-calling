@@ -1,6 +1,11 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+
+function safeParseQueue(s: string | null) {
+  if (!s) return null
+  try { return JSON.parse(s) } catch { return null }
+}
 import Anthropic from '@anthropic-ai/sdk'
 import { Resend } from 'resend'
 import { DEFAULT_TEMPLATES } from '@/lib/email-templates'
@@ -284,7 +289,7 @@ Génère un résumé de session motivant et concis en français (5-8 phrases max
     writeFullBackup().catch(() => {})
     writeSessionReport(id).catch(() => {})
 
-    return NextResponse.json({ ...updated, agenceQueue: session.agenceQueue ? JSON.parse(session.agenceQueue) : null })
+    return NextResponse.json({ ...updated, agenceQueue: safeParseQueue(session.agenceQueue) })
   }
 
   return NextResponse.json({ error: 'Action inconnue' }, { status: 400 })
@@ -308,6 +313,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!session) return NextResponse.json({ error: 'introuvable' }, { status: 404 })
   return NextResponse.json({
     ...session,
-    agenceQueue: session.agenceQueue ? JSON.parse(session.agenceQueue) : null,
+    agenceQueue: safeParseQueue(session.agenceQueue),
   })
 }

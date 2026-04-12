@@ -120,17 +120,11 @@ export async function POST() {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const messageId = parsed.messageId || `imap-sent-uid-${(msg as any).uid}`
 
-              // Use messageId stored in bodyHtml as fallback check
-              const existsOut = await prisma.emailOutbound.findFirst({
-                where: { subject: parsed.subject || '', to: parsed.to?.text || '' },
-                select: { id: true },
+              // Dedup by messageId
+              const existsOut = await prisma.emailOutbound.findUnique({
+                where: { messageId }, select: { id: true },
               })
-              // Simple dedup: skip if same subject+to already stored
-              // Use a more precise check via a dedicated messageId lookup via snippet
-              const existsIn = await prisma.emailInbound.findUnique({
-                where: { messageId: `sent-${messageId}` }, select: { id: true },
-              })
-              if (existsOut || existsIn) continue
+              if (existsOut) continue
 
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const f = (msg as any).envelope?.from?.[0]
@@ -145,6 +139,7 @@ export async function POST() {
 
               await prisma.emailOutbound.create({
                 data: {
+                  messageId,
                   from: f?.address || config.user,
                   to: t?.address || parsed.to?.text || '',
                   toName: '',
