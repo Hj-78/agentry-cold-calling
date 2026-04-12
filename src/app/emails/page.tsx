@@ -119,17 +119,32 @@ export default function EmailsPage() {
   const agenceSearchRef = useRef<HTMLDivElement>(null)
   const [syncing, setSyncing] = useState(false)
 
+  // ── Charger messages ─────────────────────────────────────────────────────
+
+  const loadMessages = useCallback(async (folder: string, q?: string, account?: AccountId) => {
+    setLoadingList(true); setSelectedMsg(null)
+    const p = new URLSearchParams({ folder })
+    if (q) p.set('q', q)
+    const acc = account ?? activeAccount
+    p.set('account', acc)
+    const res = await fetch(`/api/gmail?${p}`)
+    const data = await res.json()
+    setMessages(data.messages || [])
+    setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
+    setLoadingList(false)
+  }, [activeAccount])
+
   // ── IMAP Sync ─────────────────────────────────────────────────────────────
 
   const syncImap = useCallback(async (reload = false) => {
     setSyncing(true)
     try {
       await fetch('/api/imap/sync', { method: 'POST' })
-      if (reload) await loadMessages('inbox', undefined, activeAccount)
+      if (reload) await loadMessages('inbox')
     } finally {
       setSyncing(false)
     }
-  }, [activeAccount, loadMessages])
+  }, [loadMessages])
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -145,21 +160,6 @@ export default function EmailsPage() {
   useEffect(() => {
     loadMessages(panel === 'sent' ? 'sent' : 'inbox', undefined, activeAccount)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAccount])
-
-  // ── Charger messages ─────────────────────────────────────────────────────
-
-  const loadMessages = useCallback(async (folder: string, q?: string, account?: AccountId) => {
-    setLoadingList(true); setSelectedMsg(null)
-    const p = new URLSearchParams({ folder })
-    if (q) p.set('q', q)
-    const acc = account ?? activeAccount
-    p.set('account', acc)
-    const res = await fetch(`/api/gmail?${p}`)
-    const data = await res.json()
-    setMessages(data.messages || [])
-    setUnreadCount((data.messages || []).filter((m: GmailMessage) => !m.isRead).length)
-    setLoadingList(false)
   }, [activeAccount])
 
   // Auto-refresh: sync IMAP + reload every 2 minutes when on inbox
