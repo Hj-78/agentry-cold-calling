@@ -117,13 +117,27 @@ export default function EmailsPage() {
   const [savingTemplates, setSavingTemplates] = useState(false)
 
   const agenceSearchRef = useRef<HTMLDivElement>(null)
+  const [syncing, setSyncing] = useState(false)
+
+  // ── IMAP Sync ─────────────────────────────────────────────────────────────
+
+  const syncImap = useCallback(async (reload = false) => {
+    setSyncing(true)
+    try {
+      await fetch('/api/imap/sync', { method: 'POST' })
+      if (reload) await loadMessages('inbox', undefined, activeAccount)
+    } finally {
+      setSyncing(false)
+    }
+  }, [activeAccount, loadMessages])
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetch('/api/agences').then(r => r.json()).then(setAgences)
     fetch('/api/email-templates').then(r => r.json()).then(setTemplates)
-    loadMessages('inbox', undefined, 'primary')
+    // Sync IMAP then load messages
+    fetch('/api/imap/sync', { method: 'POST' }).then(() => loadMessages('inbox', undefined, 'primary'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -148,11 +162,12 @@ export default function EmailsPage() {
     setLoadingList(false)
   }, [activeAccount])
 
+  // Auto-refresh: sync IMAP + reload every 2 minutes when on inbox
   useEffect(() => {
     if (panel !== 'inbox') return
-    const i = setInterval(() => loadMessages('inbox'), 30000)
+    const i = setInterval(() => syncImap(true), 120000)
     return () => clearInterval(i)
-  }, [panel, loadMessages])
+  }, [panel, syncImap])
 
   const loadMessage = async (msg: GmailMessage) => {
     setLoadingMsg(true); setReplyMode(false); setReplyBody(''); setReplySent(false)
@@ -361,9 +376,11 @@ export default function EmailsPage() {
                   <h2 className="text-white font-semibold text-sm">{panel === 'inbox' ? 'Boîte de réception' : 'Envoyés'}</h2>
                   {messages.length > 0 && <p className="text-slate-600 text-xs mt-0.5">{messages.length} message{messages.length > 1 ? 's' : ''}</p>}
                 </div>
-                <button onClick={() => loadMessages(panel)}
-                  className="text-slate-500 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800">
-                  <svg className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onClick={() => syncImap(true)}
+                  disabled={syncing || loadingList}
+                  title="Synchroniser les emails"
+                  className="text-slate-500 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40">
+                  <svg className={`w-4 h-4 ${syncing || loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
