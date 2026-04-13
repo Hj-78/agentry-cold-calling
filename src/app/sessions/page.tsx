@@ -327,6 +327,7 @@ export default function SessionsPage() {
             const aRappeler = session.appels.filter(a => a.resultat === 'rappeler').length
             const rdvs = session.appels.filter(a => a.rdvPris).length
             const pitches = session.appels.filter(a => a.aPitche).length
+            const pasRepondu = session.appels.filter(a => a.resultat === 'pas_repondu').length
 
             return (
               <div key={session.id} className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden">
@@ -344,6 +345,7 @@ export default function SessionsPage() {
                         {interesses > 0 && <span className="text-green-400">✓ {interesses} intéressé{interesses > 1 ? 's' : ''}</span>}
                         {rdvs > 0 && <span className="text-yellow-400 font-semibold">📅 {rdvs} RDV</span>}
                         {aRappeler > 0 && <span className="text-amber-400">{aRappeler} à rappeler</span>}
+                        {pasRepondu > 0 && <span className="text-slate-400">{pasRepondu} pas répondu</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

@@ -70,6 +70,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [emailModalSent, setEmailModalSent] = useState(false)
   const [emailModalError, setEmailModalError] = useState('')
   const [emailModalLoaded, setEmailModalLoaded] = useState(false)
+  const [progressVisible, setProgressVisible] = useState(true)
   const [endedSession, setEndedSession] = useState<Session | null>(null)
   const [expediteur, setExpediteur] = useState('')
   const [queueIndex, setQueueIndex] = useState(initialSession.appels.length)
@@ -409,9 +410,18 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
           <span className="text-white font-mono font-bold">{formatTime(elapsed)}</span>
         </div>
-        <div className="text-center">
-          <span className="text-white font-bold text-xl tabular-nums">{session.totalAppels}</span>
-          <span className="text-slate-500 text-sm">/{session.objectif}</span>
+        <div className="text-center flex items-center gap-2">
+          <div style={progressVisible ? {} : { filter: 'blur(6px)', userSelect: 'none' }}>
+            <span className="text-white font-bold text-xl tabular-nums">{session.totalAppels}</span>
+            <span className="text-slate-500 text-sm">/{session.objectif}</span>
+          </div>
+          <button
+            onClick={() => setProgressVisible(v => !v)}
+            className="text-slate-600 hover:text-slate-400 text-xs transition leading-none"
+            title={progressVisible ? 'Masquer le compteur' : 'Afficher le compteur'}
+          >
+            {progressVisible ? '👁' : '🙈'}
+          </button>
         </div>
         <button onClick={() => setShowEndConfirm(true)}
           className="bg-red-800 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">
