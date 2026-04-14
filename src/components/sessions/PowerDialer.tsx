@@ -442,7 +442,18 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <div className="text-slate-500 text-xs uppercase tracking-widest mb-1">Appel {currentCallNum} / {queue.length || session.objectif}</div>
+                <div className="text-slate-500 text-xs uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                  <span style={progressVisible ? {} : { filter: 'blur(6px)', userSelect: 'none' }}>
+                    Appel {currentCallNum} / {queue.length || session.objectif}
+                  </span>
+                  <button
+                    onClick={() => setProgressVisible(v => !v)}
+                    className="text-slate-700 hover:text-slate-500 transition leading-none"
+                    title={progressVisible ? 'Masquer la position' : 'Afficher la position'}
+                  >
+                    {progressVisible ? '👁' : '🙈'}
+                  </button>
+                </div>
                 <h2 className="text-white font-bold text-3xl leading-tight">{currentAgence.nom}</h2>
                 {currentAgence.ville && <p className="text-slate-400 mt-1">{currentAgence.ville}</p>}
                 {(currentAgence as unknown as { adresse?: string }).adresse && (
