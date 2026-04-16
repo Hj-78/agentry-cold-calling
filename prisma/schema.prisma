@@ -76,9 +76,10 @@ model Session {
   totalAppels  Int            @default(0)
   objectif     Int            @default(50)
   resume       String?
-  agenceQueue  String?        // JSON: [{id, nom, telephone, ville}]
-  createdAt    DateTime       @default(now())
-  appels       SessionAppel[]
+  agenceQueue   String?        // JSON: [{id, nom, telephone, ville}]
+  dureeObjectif Int?           // durée cible en secondes (ex: 3600 = 1h). Null = mode compte d'appels (legacy)
+  createdAt     DateTime       @default(now())
+  appels        SessionAppel[]
 }
 
 model EmailInbound {

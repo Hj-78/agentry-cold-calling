@@ -70,7 +70,8 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [emailModalSent, setEmailModalSent] = useState(false)
   const [emailModalError, setEmailModalError] = useState('')
   const [emailModalLoaded, setEmailModalLoaded] = useState(false)
-  const [progressVisible, setProgressVisible] = useState(true)
+  const [progressVisible, setProgressVisible] = useState(false)
+  const [timeExpired, setTimeExpired] = useState(false)
   const [endedSession, setEndedSession] = useState<Session | null>(null)
   const [expediteur, setExpediteur] = useState('')
   const [queueIndex, setQueueIndex] = useState(initialSession.appels.length)
@@ -80,11 +81,15 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const callTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isListeningRef = useRef(false)
+  const autoEndRef = useRef(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const endSessionFnRef = useRef<() => Promise<void>>(async () => {})
 
+  const SESSION_DURATION = initialSession.dureeObjectif || 3600
   const queue: AgenceQueue[] = session.agenceQueue || []
   const currentAgence: AgenceQueue | null = queue[queueIndex] || null
-  const currentCallNum = session.totalAppels + 1
-  const pct = session.objectif > 0 ? Math.min(100, Math.round((session.totalAppels / session.objectif) * 100)) : 0
+  const timeLeft = Math.max(0, SESSION_DURATION - elapsed)
+  const pct = Math.min(100, Math.round((elapsed / SESSION_DURATION) * 100))
 
   useEffect(() => {
     fetch('/api/parametres').then(r => r.json()).then((d: Record<string, string>) => {
@@ -100,6 +105,24 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   useEffect(() => {
     callTimerRef.current = setInterval(() => setCallElapsed(e => e + 1), 1000)
     return () => { if (callTimerRef.current) clearInterval(callTimerRef.current) }
+  }, [])
+
+  // Garder la ref de endSession à jour pour l'auto-fin (évite les stale closures)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { endSessionFnRef.current = endSession })
+
+  // Auto-fin quand le chrono atteint 0
+  useEffect(() => {
+    if (SESSION_DURATION <= 0) return
+    const timeout = setTimeout(() => {
+      if (!autoEndRef.current) {
+        autoEndRef.current = true
+        setTimeExpired(true)
+        endSessionFnRef.current()
+      }
+    }, SESSION_DURATION * 1000)
+    return () => clearTimeout(timeout)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const startListening = useCallback(() => {
@@ -319,10 +342,18 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
     const refuses = appels.filter(a => a.resultat === 'pas_interesse').length
     const pitches = appels.filter(a => a.aPitche === true).length
     const dureeTotal = endedSession.duree || elapsed
+    const tauxReponse = total > 0 ? Math.round(((total - pasRepondu - messagerie) / total) * 100) : 0
 
     return (
       <div className="min-h-screen bg-slate-950 overflow-y-auto">
         <div className="max-w-xl mx-auto px-5 py-10">
+
+          {timeExpired && (
+            <div className="bg-amber-900/30 border border-amber-600/50 rounded-2xl px-5 py-3 mb-6 text-amber-300 text-base font-semibold text-center">
+              ⏰ Temps écoulé — session terminée automatiquement
+            </div>
+          )}
+
           <div className="text-center mb-10">
             <div className="text-6xl mb-4">{rdvs > 0 ? '🎯' : interesses > 0 ? '✅' : '📊'}</div>
             <h1 className="text-4xl font-bold text-white mb-2">Bilan de session</h1>
@@ -332,7 +363,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
               <div className="text-5xl font-bold text-white mb-1">{total}</div>
-              <div className="text-slate-500 text-sm">Appels <span className="text-slate-600">/ {endedSession.objectif}</span></div>
+              <div className="text-slate-500 text-sm">Appels réalisés</div>
             </div>
             <div className={`border rounded-2xl p-6 text-center ${rdvs > 0 ? 'bg-green-900/30 border-green-700' : 'bg-slate-900 border-slate-800'}`}>
               <div className={`text-5xl font-bold mb-1 ${rdvs > 0 ? 'text-green-400' : 'text-slate-500'}`}>{rdvs}</div>
@@ -344,11 +375,12 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'Intéressés', val: interesses, color: 'text-green-400' },
+                { label: 'Pas intéressés', val: refuses, color: 'text-red-400' },
                 { label: 'À rappeler', val: aRappeler, color: 'text-amber-400' },
                 { label: 'Pas répondu', val: pasRepondu, color: 'text-slate-400' },
                 { label: 'Messagerie', val: messagerie, color: 'text-blue-400' },
-                { label: 'Refusés', val: refuses, color: 'text-red-400' },
                 { label: 'Pitchés', val: pitches, color: 'text-purple-400' },
+                { label: 'Taux de réponse', val: `${tauxReponse}%`, color: tauxReponse >= 50 ? 'text-green-400' : 'text-indigo-400' },
                 { label: 'Durée moy.', val: total > 0 ? `${Math.floor(Math.round(dureeTotal/total)/60)}m${String(Math.round(dureeTotal/total)%60).padStart(2,'0')}s` : '—', color: 'text-indigo-400' },
               ].map(item => (
                 <div key={item.label} className="bg-slate-800 rounded-xl p-4 text-center">
@@ -405,33 +437,44 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
     <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col overflow-hidden">
 
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-5 py-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-          <span className="text-white font-mono font-bold">{formatTime(elapsed)}</span>
+      <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+        {/* Gauche : Terminer */}
+        <button onClick={() => setShowEndConfirm(true)}
+          className="bg-red-800 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition flex-shrink-0">
+          Terminer
+        </button>
+
+        {/* Centre : Compte à rebours */}
+        <div className="flex flex-col items-center mx-2">
+          <span className={`font-mono font-bold tabular-nums leading-none ${
+            timeLeft <= 300 ? 'text-red-400 text-3xl' : timeLeft <= 600 ? 'text-amber-400 text-3xl' : 'text-white text-3xl'
+          }`}>
+            {formatTime(timeLeft)}
+          </span>
+          <span className="text-slate-600 text-xs mt-0.5">restant</span>
         </div>
-        <div className="text-center flex items-center gap-2">
+
+        {/* Droite : nb appels (masqué par défaut) */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <div style={progressVisible ? {} : { filter: 'blur(6px)', userSelect: 'none' }}>
-            <span className="text-white font-bold text-xl tabular-nums">{session.totalAppels}</span>
-            <span className="text-slate-500 text-sm">/{session.objectif}</span>
+            <span className="text-slate-400 tabular-nums text-sm font-mono">{session.totalAppels}</span>
+            <span className="text-slate-600 text-xs"> ap.</span>
           </div>
           <button
             onClick={() => setProgressVisible(v => !v)}
-            className="text-slate-600 hover:text-slate-400 text-xs transition leading-none"
+            className="text-slate-700 hover:text-slate-500 text-xs transition leading-none"
             title={progressVisible ? 'Masquer le compteur' : 'Afficher le compteur'}
           >
             {progressVisible ? '👁' : '🙈'}
           </button>
         </div>
-        <button onClick={() => setShowEndConfirm(true)}
-          className="bg-red-800 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">
-          Terminer
-        </button>
       </div>
 
-      {/* Barre progression */}
+      {/* Barre de progression (temps écoulé) */}
       <div className="h-1 bg-slate-800 flex-shrink-0">
-        <div className="h-1 bg-indigo-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+        <div className={`h-1 transition-all duration-1000 ${
+          timeLeft <= 300 ? 'bg-red-500' : timeLeft <= 600 ? 'bg-amber-500' : 'bg-indigo-500'
+        }`} style={{ width: `${pct}%` }} />
       </div>
 
       {/* Contenu principal — scrollable */}
@@ -442,18 +485,6 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <div className="text-slate-500 text-xs uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                  <span style={progressVisible ? {} : { filter: 'blur(6px)', userSelect: 'none' }}>
-                    Appel {currentCallNum} / {queue.length || session.objectif}
-                  </span>
-                  <button
-                    onClick={() => setProgressVisible(v => !v)}
-                    className="text-slate-700 hover:text-slate-500 transition leading-none"
-                    title={progressVisible ? 'Masquer la position' : 'Afficher la position'}
-                  >
-                    {progressVisible ? '👁' : '🙈'}
-                  </button>
-                </div>
                 <h2 className="text-white font-bold text-3xl leading-tight">{currentAgence.nom}</h2>
                 {currentAgence.ville && <p className="text-slate-400 mt-1">{currentAgence.ville}</p>}
                 {(currentAgence as unknown as { adresse?: string }).adresse && (

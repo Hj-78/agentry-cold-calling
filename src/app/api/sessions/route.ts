@@ -26,25 +26,23 @@ export async function POST(req: Request) {
     data: { status: 'ended', duree: 0 },
   })
 
-  const objectif = body.objectif || 50
+  // Mode temps : durée fixe en secondes (default 3600 = 1h). On charge TOUTES les agences dispo.
+  const dureeObjectif: number = body.dureeObjectif || 3600
   const villesFiltre: string[] | null = Array.isArray(body.villes) && body.villes.length > 0 ? body.villes : null
 
   // Construire le filtre
   const where: Record<string, unknown> = { statut: 'nouveau', telephone: { not: null } }
   if (villesFiltre) where.ville = { in: villesFiltre }
 
-  // Récupérer les agences — si villes spécifiques : ordre alphabétique nom
-  // Si toutes les villes : on récupère toutes puis on trie par taille de ville (grandes d'abord)
+  // Récupérer TOUTES les agences disponibles (pas de limite), triées par taille de ville
   let agencesAAppeler
   if (villesFiltre) {
     agencesAAppeler = await prisma.agence.findMany({
       where,
       orderBy: [{ ville: 'asc' }, { nom: 'asc' }],
-      take: objectif,
       select: { id: true, nom: true, telephone: true, email: true, ville: true, adresse: true },
     })
   } else {
-    // Récupérer toutes + trier par taille de ville (grosses villes d'abord, petites à la fin)
     const [allAgences, villeStats] = await Promise.all([
       prisma.agence.findMany({
         where,
@@ -58,7 +56,6 @@ export async function POST(req: Request) {
         orderBy: { _count: { id: 'desc' } },
       }),
     ])
-    // Map ville → rank (position dans le classement par count desc)
     const villeRank: Record<string, number> = {}
     villeStats.forEach((v, i) => { if (v.ville) villeRank[v.ville] = i })
     allAgences.sort((a, b) => {
@@ -67,12 +64,13 @@ export async function POST(req: Request) {
       if (ra !== rb) return ra - rb
       return a.nom.localeCompare(b.nom)
     })
-    agencesAAppeler = allAgences.slice(0, objectif)
+    agencesAAppeler = allAgences
   }
 
   const session = await prisma.session.create({
     data: {
-      objectif,
+      objectif: agencesAAppeler.length, // nb réel d'agences chargées
+      dureeObjectif,
       status: 'active',
       agenceQueue: JSON.stringify(agencesAAppeler),
     },

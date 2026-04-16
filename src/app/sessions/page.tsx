@@ -34,14 +34,11 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [launching, setLaunching] = useState(false)
-  const [objectif, setObjectif] = useState(50)
   const [disponibles, setDisponibles] = useState<number | null>(null)
   const [villes, setVilles] = useState<CityCount[]>([])
   const [villesChoisies, setVillesChoisies] = useState<string[]>([]) // [] = toutes
   const [deletingVille, setDeletingVille] = useState<string | null>(null)
   const [confirmDeleteVille, setConfirmDeleteVille] = useState<string | null>(null)
-  const OBJECTIF_MIN = 10
-
   const fetchData = async () => {
     const [listRes, activeRes, agencesRes, villesRes] = await Promise.all([
       fetch('/api/sessions'),
@@ -62,16 +59,6 @@ export default function SessionsPage() {
 
   useEffect(() => { fetchData() }, [])
 
-  // Quand on choisit des villes, mettre à jour l'objectif au total des counts
-  useEffect(() => {
-    if (villesChoisies.length > 0) {
-      const total = villes
-        .filter(v => v.ville && villesChoisies.includes(v.ville))
-        .reduce((sum, v) => sum + v.count, 0)
-      setObjectif(total || 1)
-    }
-  }, [villesChoisies, villes])
-
   const toggleVille = (ville: string) => {
     setVillesChoisies(prev =>
       prev.includes(ville) ? prev.filter(v => v !== ville) : [...prev, ville]
@@ -87,7 +74,7 @@ export default function SessionsPage() {
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ objectif, villes: villesChoisies.length > 0 ? villesChoisies : null }),
+      body: JSON.stringify({ dureeObjectif: 3600, villes: villesChoisies.length > 0 ? villesChoisies : null }),
     })
     const session = await res.json()
     if (!session.agenceQueue || session.agenceQueue.length === 0) {
@@ -118,7 +105,7 @@ export default function SessionsPage() {
     const lines = [
       `Session du ${formatDate(session.date)}`,
       `Durée : ${session.duree ? formatTime(session.duree) : 'N/A'}`,
-      `Appels : ${session.totalAppels}/${session.objectif}`,
+      `Appels : ${session.totalAppels}`,
       '',
     ]
     if (session.resume) lines.push(session.resume, '')
@@ -180,7 +167,7 @@ export default function SessionsPage() {
               <label className="text-slate-400 text-sm">📍 Villes à appeler</label>
               {villesChoisies.length > 0 && (
                 <button
-                  onClick={() => { setVillesChoisies([]); setObjectif(Math.min(disponibles ?? 50, 50)) }}
+                  onClick={() => setVillesChoisies([])}
                   className="text-xs text-slate-500 hover:text-slate-300 transition"
                 >
                   Tout déselectionner
@@ -189,7 +176,7 @@ export default function SessionsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
-                onClick={() => { setVillesChoisies([]); setObjectif(Math.min(disponibles ?? 50, 50)) }}
+                onClick={() => setVillesChoisies([])}
                 className={`py-3 px-4 rounded-xl text-sm font-semibold transition border ${
                   villesChoisies.length === 0
                     ? 'bg-indigo-600 border-indigo-500 text-white'
@@ -242,28 +229,19 @@ export default function SessionsPage() {
           </div>
         )}
 
-        {/* Objectif */}
+        {/* Durée fixe + info agences dispo */}
         <div className="flex items-center gap-4 mb-6">
-          <div>
-            <label className="text-slate-400 text-sm block mb-2">Objectif d&apos;appels</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={1}
-                max={500}
-                value={objectif}
-                onChange={e => setObjectif(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-24 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-xl font-bold text-center"
-              />
-              <span className="text-slate-500 text-base">appels</span>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-3 flex items-center gap-3">
+            <span className="text-2xl">⏱</span>
+            <div>
+              <div className="text-white font-bold text-lg">1 heure</div>
+              <div className="text-slate-500 text-xs">durée de session</div>
             </div>
           </div>
-          {villesChoisies.length > 0 && (
-            <div className="flex-1 bg-indigo-900/30 border border-indigo-700/40 rounded-xl px-4 py-3">
-              <div className="text-indigo-300 text-xs font-semibold mb-0.5">{villesChoisies.length} ville{villesChoisies.length > 1 ? 's' : ''} sélectionnée{villesChoisies.length > 1 ? 's' : ''}</div>
-              <div className="text-indigo-400 text-xs">{dispoTotal} agences dispo</div>
-            </div>
-          )}
+          <div className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3">
+            <div className="text-slate-300 font-semibold">{dispoTotal}</div>
+            <div className="text-slate-500 text-xs">{villesChoisies.length > 0 ? `agences dans ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : 'agences disponibles'}</div>
+          </div>
         </div>
 
         {dispoTotal === 0 && (
@@ -277,7 +255,7 @@ export default function SessionsPage() {
           disabled={launching || dispoTotal === 0}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-lg md:text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50 min-h-[56px]"
         >
-          {launching ? 'Démarrage…' : villesChoisies.length > 0 ? `▶ Lancer — ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : '▶ Lancer la session'}
+          {launching ? 'Démarrage…' : villesChoisies.length > 0 ? `▶ Lancer la session (1h) — ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : '▶ Lancer la session (1h)'}
         </button>
 
         {/* Modal confirmation suppression ville */}
@@ -319,9 +297,10 @@ export default function SessionsPage() {
         <div className="space-y-4">
           <h2 className="text-slate-400 text-sm font-medium uppercase tracking-widest mb-6">Historique</h2>
           {sessions.map(session => {
-            const pct = session.objectif > 0
-              ? Math.min(100, Math.round((session.totalAppels / session.objectif) * 100))
-              : 0
+            const isTimeBased = !!session.dureeObjectif
+            const pct = isTimeBased
+              ? (session.dureeObjectif! > 0 && session.duree ? Math.min(100, Math.round((session.duree / session.dureeObjectif!) * 100)) : 100)
+              : (session.objectif > 0 ? Math.min(100, Math.round((session.totalAppels / session.objectif) * 100)) : 0)
             const isExpanded = expandedId === session.id
             const interesses = session.appels.filter(a => a.resultat === 'interesse').length
             const aRappeler = session.appels.filter(a => a.resultat === 'rappeler').length
@@ -349,9 +328,11 @@ export default function SessionsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`text-lg font-bold ${pct >= 100 ? 'text-green-400' : 'text-indigo-400'}`}>
-                        {pct}%
-                      </span>
+                      {!isTimeBased && (
+                        <span className={`text-lg font-bold ${pct >= 100 ? 'text-green-400' : 'text-indigo-400'}`}>
+                          {pct}%
+                        </span>
+                      )}
                       <span className="text-slate-600">{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </div>

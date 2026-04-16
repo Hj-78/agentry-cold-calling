@@ -35,6 +35,7 @@ export interface Session {
   status: string
   totalAppels: number
   objectif: number
+  dureeObjectif?: number | null
   resume?: string | null
   agenceQueue?: AgenceQueue[] | null
   createdAt: string
