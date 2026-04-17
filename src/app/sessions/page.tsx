@@ -137,7 +137,13 @@ export default function SessionsPage() {
           <p className="text-slate-500 text-base mb-1">{sessions.length} session{sessions.length > 1 ? 's' : ''} passée{sessions.length > 1 ? 's' : ''}</p>
           <h1 className="text-3xl font-bold text-white">Sessions</h1>
         </div>
-        <div className="flex gap-2 mt-1">
+        <div className="flex gap-2 mt-1 flex-wrap">
+          <a
+            href="/sessions/historique"
+            className="text-xs px-3 py-2 rounded-xl bg-indigo-900/50 border border-indigo-700/50 text-indigo-300 hover:text-white hover:border-indigo-600 transition font-medium"
+          >
+            📋 Historique
+          </a>
           <a
             href="/api/export?format=csv"
             download

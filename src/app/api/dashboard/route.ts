@@ -30,6 +30,7 @@ function calcStats(appels: { resultat: string | null; aPitche: boolean | null; r
     rdvs: appels.filter(a => a.rdvPris).length,
     pitches: appels.filter(a => a.aPitche).length,
     rappeler: appels.filter(a => a.resultat === 'rappeler').length,
+    pasRepondu: appels.filter(a => a.resultat === 'pas_repondu').length,
     messagerie: appels.filter(a => a.resultat === 'messagerie' || a.resultat === 'absent').length,
   }
 }
@@ -155,6 +156,7 @@ export async function GET() {
     totalAppels: lastSession.totalAppels,
     interesses: lastSession.appels.filter(a => a.resultat === 'interesse').length,
     pasInteresses: lastSession.appels.filter(a => a.resultat === 'pas_interesse').length,
+    pasRepondu: lastSession.appels.filter(a => a.resultat === 'pas_repondu').length,
     rdvs: lastSession.appels.filter(a => a.rdvPris).length,
     pitches: lastSession.appels.filter(a => a.aPitche).length,
     duree: lastSession.duree,

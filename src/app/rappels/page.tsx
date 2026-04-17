@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { scheduleNotification, requestNotificationPermission } from '@/lib/notifications'
 
 interface Agence { id: number; nom: string }
+interface AgenceARappeler {
+  id: number; nom: string; telephone: string | null; ville: string | null; notes: string | null; updatedAt: string
+}
 interface Rappel {
   id: number; dateHeure: string; note: string | null; fait: boolean
   agence: { nom: string } | null; agenceId: number | null
@@ -28,6 +31,7 @@ function defaultDateTime() {
 
 export default function RappelsPage() {
   const [agences, setAgences] = useState<Agence[]>([])
+  const [agencesARappeler, setAgencesARappeler] = useState<AgenceARappeler[]>([])
   const [rappels, setRappels] = useState<Rappel[]>([])
   const [agenceId, setAgenceId] = useState('')
   const [date, setDate] = useState(() => defaultDateTime().split('T')[0])
@@ -46,9 +50,25 @@ export default function RappelsPage() {
     })
   }
 
+  const fetchAgencesARappeler = async () => {
+    const res = await fetch('/api/agences?statut=rappeler')
+    const data = await res.json().catch(() => [])
+    setAgencesARappeler(Array.isArray(data) ? data : [])
+  }
+
+  const marquerRappele = async (id: number) => {
+    await fetch('/api/agences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, statut: 'appele' }),
+    })
+    fetchAgencesARappeler()
+  }
+
   useEffect(() => {
     fetch('/api/agences').then(r => r.json()).then(setAgences)
     fetchRappels()
+    fetchAgencesARappeler()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,6 +130,42 @@ export default function RappelsPage() {
           </button>
         </div>
       </div>
+
+      {/* ── AGENCES À RAPPELER (issues des sessions) ── */}
+      {agencesARappeler.length > 0 && (
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="text-slate-400 text-sm font-semibold uppercase tracking-widest">🔄 À rappeler — depuis vos sessions</div>
+            <span className="bg-amber-900/50 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full">{agencesARappeler.length}</span>
+          </div>
+          <div className="space-y-3">
+            {agencesARappeler.map(a => (
+              <div key={a.id} className="bg-slate-900 border border-amber-800/40 rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-semibold text-lg">{a.nom}</div>
+                    {a.ville && <div className="text-slate-500 text-sm mt-0.5">📍 {a.ville}</div>}
+                    {a.telephone && (
+                      <a href={`tel:${a.telephone.replace(/\s/g, '')}`}
+                        className="inline-flex items-center gap-2 mt-2 text-green-400 font-mono font-bold text-base hover:text-green-300 transition">
+                        📞 {a.telephone}
+                      </a>
+                    )}
+                    {a.notes && <p className="text-slate-400 text-sm mt-2 italic">{a.notes}</p>}
+                    <div className="text-slate-700 text-xs mt-2">Qualifié le {new Date(a.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                  </div>
+                  <button
+                    onClick={() => marquerRappele(a.id)}
+                    className="bg-green-700 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition flex-shrink-0"
+                  >
+                    ✅ Rappelé
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Formulaire */}
       {showForm && (

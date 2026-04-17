@@ -24,6 +24,7 @@ interface PeriodStats {
   rdvs: number
   pitches: number
   rappeler: number
+  pasRepondu: number
   messagerie: number
   joursActifs?: number
   moyenneJour?: number
@@ -35,6 +36,7 @@ interface LastSessionStats {
   totalAppels: number
   interesses: number
   pasInteresses: number
+  pasRepondu: number
   rdvs: number
   pitches: number
   duree: number
@@ -245,15 +247,10 @@ export default function DashboardPage() {
             { label: 'Intéressés', val: statsActives.interesses, color: 'text-green-400', emoji: '✅' },
             { label: 'Pas intéressés', val: statsActives.pasInteresses, color: 'text-red-400', emoji: '❌' },
             { label: 'RDV pris', val: statsActives.rdvs, color: 'text-yellow-400', emoji: '📅' },
-            { label: 'Pitchés', val: statsActives.pitches, color: 'text-purple-400', emoji: '🎤' },
             { label: 'À rappeler', val: statsActives.rappeler, color: 'text-amber-400', emoji: '🔄' },
-            { label: 'Messagerie', val: statsActives.messagerie, color: 'text-slate-400', emoji: '📵' },
-            {
-              label: periodeActive === 'mois' ? 'Moy/jour (mois)' : 'Moy/jour',
-              val: statsActives.moyenneJour ?? 0,
-              color: 'text-indigo-400',
-              emoji: '📊',
-            },
+            { label: 'Pas répondu', val: statsActives.pasRepondu, color: 'text-slate-400', emoji: '📵' },
+            { label: 'Messagerie', val: statsActives.messagerie, color: 'text-blue-400', emoji: '🔇' },
+            { label: 'Pitchés', val: statsActives.pitches, color: 'text-purple-400', emoji: '🎤' },
           ].map(item => (
             <div key={item.label} className="bg-slate-800/60 rounded-xl p-3 flex items-center gap-3">
               <span className="text-base">{item.emoji}</span>
@@ -263,6 +260,13 @@ export default function DashboardPage() {
               </div>
             </div>
           ))}
+          <div className="col-span-2 bg-slate-800/60 rounded-xl p-3 flex items-center gap-3">
+            <span className="text-base">📊</span>
+            <div>
+              <div className="text-xl font-bold tabular-nums text-indigo-400">{statsActives.moyenneJour ?? 0}</div>
+              <div className="text-slate-500 text-xs leading-tight">{periodeActive === 'mois' ? 'Moy/jour (mois)' : 'Moy/jour'}</div>
+            </div>
+          </div>
         </div>
 
         {/* Entonnoir */}
@@ -298,10 +302,11 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-2 mt-3">
             {[
               { emoji: '📞', val: lastSession.totalAppels, label: 'appels', color: 'text-white' },
-              { emoji: '🎤', val: lastSession.pitches, label: 'pitchés', color: 'text-purple-400' },
               { emoji: '✅', val: lastSession.interesses, label: 'intéressés', color: 'text-green-400' },
-              { emoji: '❌', val: lastSession.pasInteresses, label: 'refus', color: 'text-red-400' },
               { emoji: '📅', val: lastSession.rdvs, label: 'RDV', color: 'text-yellow-400' },
+              { emoji: '❌', val: lastSession.pasInteresses, label: 'refus', color: 'text-red-400' },
+              { emoji: '📵', val: lastSession.pasRepondu, label: 'pas répondu', color: 'text-slate-400' },
+              { emoji: '🎤', val: lastSession.pitches, label: 'pitchés', color: 'text-purple-400' },
             ].map(item => (
               <div key={item.label} className="bg-slate-800/60 rounded-xl p-2.5 text-center">
                 <div className="text-sm mb-0.5">{item.emoji}</div>
