@@ -737,15 +737,17 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                   <div>
                     <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">📌 Angle</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Si je vous dis qu&apos;on peut vous générer entre <span className="text-cyan-300 font-medium">5 et 10 rendez-vous acheteurs par mois</span>, directement bookés dans votre calendrier — est-ce que ça vous intéresse ? »</p>
+                      <p>« Après avoir échangé avec plusieurs agents dans votre secteur, on a remarqué que beaucoup avaient du mal à <span className="text-cyan-300 font-medium">générer des acheteurs qualifiés régulièrement</span>. C&apos;est quelque chose qui vous concerne ? »</p>
                       <p className="text-slate-500 italic text-xs">(Si non → objections. Si oui → pitch.)</p>
                     </div>
                   </div>
 
                   <div>
                     <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
-                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« On met en place tout le <span className="text-green-300 font-medium">système d&apos;acquisition</span> pour vous — les publicités Meta, le tunnel, les relances automatiques SMS et email. Les acheteurs passent par le tunnel, ils sont qualifiés, et ils bookent directement dans votre calendrier. »</p>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-2">
+                      <p>« C&apos;est exactement ce qu&apos;on règle. On vous amène entre <span className="text-green-300 font-medium">5 et 15 rendez-vous par mois</span> avec des acheteurs qualifiés, directement bookés dans votre calendrier. <span className="text-green-300 font-medium">Vous avez juste à faire le rendez-vous.</span> »</p>
+                      <p className="text-slate-500 italic text-xs">(S&apos;il demande comment :)</p>
+                      <p>« On met en place toute la pub et le système de qualification pour vous — les acheteurs passent par notre tunnel, ils sont qualifiés, et ils bookent directement dans votre agenda. »</p>
                     </div>
                   </div>
 
