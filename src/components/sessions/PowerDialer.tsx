@@ -51,6 +51,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [showTranscription, setShowTranscription] = useState(false)
   const [showScript, setShowScript] = useState(false)
   const [scriptObjIndex, setScriptObjIndex] = useState<number | null>(null)
+  const [selectedScript, setSelectedScript] = useState<'v1'|'v2'|'v3'>('v1')
   const [showRappelModal, setShowRappelModal] = useState(false)
   const [rappelJour, setRappelJour] = useState('')
   const [rappelPlage, setRappelPlage] = useState('')
@@ -698,79 +699,175 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           </button>
 
           {showScript && (
-            <div className="px-5 pb-5 border-t border-slate-800 space-y-4 pt-4">
+            <div className="border-t border-slate-800">
 
-              {/* Ouverture */}
-              <div>
-                <div className="text-xs text-indigo-400 font-semibold uppercase tracking-wider mb-2">🎯 Ouverture</div>
-                <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                  <p>« Bonjour, est-ce que je parle bien à <span className="text-indigo-300 font-medium">[Nom de l&apos;agence]</span> ? »</p>
-                  <p className="text-slate-500 italic text-xs">(Oui c&apos;est bien ça.)</p>
-                  <p className="mt-1">« Si je vous dis que c&apos;est un appel de prospection, vous raccrochez, ou vous me laissez <span className="text-indigo-300 font-medium">10 secondes</span> pour vous expliquer ? »</p>
-                  <p className="text-slate-500 italic text-xs">(Laisser répondre — en général ils sourient et disent &quot;allez-y&quot;.)</p>
-                </div>
+              {/* Sélecteur V1 / V2 / V3 */}
+              <div className="flex gap-2 px-5 pt-4 pb-3">
+                {(['v1','v2','v3'] as const).map((v) => {
+                  const labels: Record<string, string> = { v1: 'V1 — Résultat', v2: 'V2 — Curiosité', v3: 'V3 — Problème' }
+                  const active = selectedScript === v
+                  return (
+                    <button key={v} onClick={() => { setSelectedScript(v); setScriptObjIndex(null) }}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${
+                        active
+                          ? 'bg-indigo-600 border-indigo-500 text-white'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-indigo-600 hover:text-indigo-300'
+                      }`}>
+                      {labels[v]}
+                    </button>
+                  )
+                })}
               </div>
 
-              {/* Pitch */}
-              <div>
-                <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
-                <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                  <p>« On a remarqué que les agents immobiliers perdent beaucoup de temps à <span className="text-green-300 font-medium">prospecter manuellement sur LeBonCoin</span>. Nous on a créé un système qui fait ça à votre place — il <span className="text-green-300 font-medium">détecte les nouvelles annonces, envoie un message en automatique, et gère la conversation jusqu&apos;au rendez-vous.</span> Vos agents reçoivent directement les contacts qualifiés. »</p>
-                  <p className="text-slate-500 italic text-xs">(Laisser répondre.)</p>
-                  <p className="mt-1">« On cherche des agences partenaires pour tester ça <span className="text-green-300 font-medium">7 jours gratuitement</span>. Vous auriez <span className="text-green-300 font-medium">5 à 10 minutes</span> cette semaine pour qu&apos;on vous montre comment ça marche ? »</p>
-                </div>
-              </div>
+              <div className="px-5 pb-5 space-y-4">
 
-              {/* Verrouiller le RDV */}
-              <div>
-                <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Verrouiller le RDV</div>
-                <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-2">
-                  <p className="text-slate-500 italic text-xs">(S&apos;il dit oui :)</p>
-                  <p>« Parfait. Je peux <span className="text-purple-300 font-medium">passer directement à l&apos;agence</span> si vous préférez, ou on fait ça par téléphone. Vous seriez disponible plutôt <span className="text-purple-300 font-medium">en début ou en fin de semaine</span> ? »</p>
-                  <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
-                  <p>« Super. Y aurait-il une raison pour laquelle vous ne pourriez pas être là à ce moment-là ? Je vous demande parce qu&apos;on a <span className="text-purple-300 font-medium">d&apos;autres agences dans votre secteur intéressées</span>, et je veux vous donner la priorité sur la zone. »</p>
+                {/* ── OUVERTURE (commune aux 3) ── */}
+                <div>
+                  <div className="text-xs text-indigo-400 font-semibold uppercase tracking-wider mb-2">🎯 Ouverture</div>
+                  <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                    <p>« Bonjour, est-ce que je parle bien à <span className="text-indigo-300 font-medium">[Nom de l&apos;agence]</span> ? »</p>
+                    <p className="text-slate-500 italic text-xs">(Confirme.)</p>
+                    <p className="mt-1">« Si je vous dis que c&apos;est un appel de prospection — vous raccrochez, ou vous me laissez <span className="text-indigo-300 font-medium">10 secondes</span> ? »</p>
+                    <p className="text-slate-500 italic text-xs">(En général ils sourient et disent &quot;allez-y&quot;.)</p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Objections */}
-              <div>
-                <div className="text-xs text-amber-400 font-semibold uppercase tracking-wider mb-2">🛡 Objections</div>
-                <div className="space-y-2">
-                  {[
-                    {
-                      label: '« C\'est quoi exactement ? »',
-                      reponse: '« C\'est ce que je vous montre en dix minutes — c\'est beaucoup plus clair à voir qu\'à expliquer. Vous êtes dispo plutôt le matin ou l\'après-midi ? »',
-                    },
-                    {
-                      label: '« Envoyez un mail »',
-                      reponse: '« Pas de souci. Vous auriez quand même dix minutes cette semaine pour qu\'on en parle ? C\'est vraiment plus parlant en direct. »',
-                    },
-                    {
-                      label: '« On n\'a pas le temps »',
-                      reponse: '« C\'est exactement le problème que le système règle. Cinq minutes suffit — plutôt cette semaine ou la semaine prochaine ? »',
-                    },
-                    {
-                      label: '« On fait déjà LeBonCoin »',
-                      reponse: '« Justement — est-ce que vous seriez curieux de voir comment le faire sans que vos agents y passent du temps ? »',
-                    },
-                  ].map((obj, i) => (
-                    <div key={i} className="rounded-xl border border-slate-700 overflow-hidden">
-                      <button
-                        onClick={() => setScriptObjIndex(scriptObjIndex === i ? null : i)}
-                        className="w-full text-left px-4 py-3 bg-slate-800 hover:bg-slate-700 transition text-sm font-medium text-amber-300 flex items-center justify-between">
-                        <span>{obj.label}</span>
-                        <span className="text-slate-500 text-xs ml-2 flex-shrink-0">{scriptObjIndex === i ? '▲' : '▼'}</span>
-                      </button>
-                      {scriptObjIndex === i && (
-                        <div className="px-4 py-3 bg-amber-900/10 text-sm text-slate-300 leading-relaxed border-t border-slate-700">
-                          {obj.reponse}
-                        </div>
-                      )}
+                {/* ── V1 — ANGLE RÉSULTAT ── */}
+                {selectedScript === 'v1' && (<>
+                  <div>
+                    <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">📌 Angle</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Si je vous dis qu&apos;on peut vous générer entre <span className="text-cyan-300 font-medium">5 et 10 rendez-vous acheteurs par mois</span>, directement bookés dans votre calendrier — est-ce que ça vous intéresse ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si non → objections. Si oui → pitch.)</p>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
+                  <div>
+                    <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« On met en place tout le <span className="text-green-300 font-medium">système d&apos;acquisition</span> pour vous — les publicités Meta, le tunnel, les relances automatiques SMS et email. Les acheteurs passent par le tunnel, ils sont qualifiés, et ils bookent directement dans votre calendrier. »</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Rendez-vous</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« On sélectionne des agences partenaires dans votre secteur pour tester ça <span className="text-purple-300 font-medium">gratuitement</span>. Vous auriez <span className="text-purple-300 font-medium">20 minutes</span> cette semaine ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si oui :)</p>
+                      <p>« Parfait. Plutôt début ou fin de semaine ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Une fois le jour :)</p>
+                      <p>« Matin ou après-midi ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
+                      <p>« Je note <span className="text-purple-300 font-medium">[jour] à [heure]</span>. Y a-t-il une raison pour laquelle vous ne pourriez pas être là ? Je vous pose la question parce qu&apos;on a d&apos;autres agences dans votre secteur — <span className="text-purple-300 font-medium">je veux vous donner la priorité</span>. »</p>
+                    </div>
+                  </div>
+                </>)}
+
+                {/* ── V2 — ANGLE CURIOSITÉ ── */}
+                {selectedScript === 'v2' && (<>
+                  <div>
+                    <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">🔍 Question curiosité</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Est-ce que vous avez des acheteurs qui vous contactent en ce moment, ou c&apos;est vous qui devez <span className="text-cyan-300 font-medium">aller les chercher</span> ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si &quot;je dois les chercher&quot; → pitch direct.)</p>
+                      <p className="text-slate-500 italic text-xs">(Si &quot;j&apos;en ai déjà&quot; :) « Ils bookent directement dans votre calendrier, ou vous devez les rappeler ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Puis :) « Parce que c&apos;est ça qu&apos;on automatise entièrement — de la pub jusqu&apos;au booking dans votre agenda. »</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« On met en place tout le <span className="text-green-300 font-medium">système d&apos;acquisition</span> pour vous — les publicités Meta, le tunnel, les relances automatiques SMS et email. Les acheteurs passent par le tunnel, ils sont qualifiés, et ils bookent directement dans votre calendrier. »</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Rendez-vous</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« On cherche des agences partenaires dans votre secteur pour tester ça <span className="text-purple-300 font-medium">gratuitement</span>. Vous seriez curieux de voir comment ça marche en pratique ? <span className="text-purple-300 font-medium">20 minutes.</span> »</p>
+                      <p className="text-slate-500 italic text-xs">(Si oui :)</p>
+                      <p>« Parfait. Plutôt début ou fin de semaine ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Une fois le jour :)</p>
+                      <p>« Matin ou après-midi ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
+                      <p>« Je note <span className="text-purple-300 font-medium">[jour] à [heure]</span>. Y a-t-il une raison pour laquelle vous ne pourriez pas être là ? Je vous pose la question parce qu&apos;on a d&apos;autres agences dans votre secteur — <span className="text-purple-300 font-medium">je veux vous donner la priorité</span>. »</p>
+                    </div>
+                  </div>
+                </>)}
+
+                {/* ── V3 — ANGLE PROBLÈME ── */}
+                {selectedScript === 'v3' && (<>
+                  <div>
+                    <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">❓ Question problème</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Est-ce que vous avez la place dans votre calendrier pour accueillir entre <span className="text-cyan-300 font-medium">5 à 10 RDV acheteurs supplémentaires</span> ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si &quot;beaucoup&quot; ou soupire → continuer.)</p>
+                      <p className="text-slate-500 italic text-xs">(Si &quot;aucun, j&apos;ai déjà ce qu&apos;il faut&quot; → « Vous êtes bien organisé — bonne continuation. »)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« On met en place tout le <span className="text-green-300 font-medium">système d&apos;acquisition</span> pour vous — les publicités Meta, le tunnel, les relances automatiques SMS et email. Les acheteurs passent par le tunnel, ils sont qualifiés, et ils bookent directement dans votre calendrier. »</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Rendez-vous</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« On cherche des agences pour tester ça <span className="text-purple-300 font-medium">gratuitement</span> dans votre secteur. Vous auriez <span className="text-purple-300 font-medium">20 minutes</span> cette semaine ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si oui :)</p>
+                      <p>« Parfait. Plutôt début ou fin de semaine ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Une fois le jour :)</p>
+                      <p>« Matin ou après-midi ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
+                      <p>« Je note <span className="text-purple-300 font-medium">[jour] à [heure]</span>. Y a-t-il une raison pour laquelle vous ne pourriez pas être là ? Je vous pose la question parce qu&apos;on a d&apos;autres agences dans votre secteur — <span className="text-purple-300 font-medium">je veux vous donner la priorité</span>. »</p>
+                    </div>
+                  </div>
+                </>)}
+
+                {/* ── OBJECTIONS (communes aux 3) ── */}
+                <div>
+                  <div className="text-xs text-amber-400 font-semibold uppercase tracking-wider mb-2">🛡 Objections</div>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        label: '« C\'est quoi exactement ? »',
+                        reponse: '« C\'est ce que je vous montre en 20 minutes — c\'est beaucoup plus clair à voir qu\'à expliquer. Vous êtes dispo plutôt le matin ou l\'après-midi ? »',
+                      },
+                      {
+                        label: '« Envoyez un mail »',
+                        reponse: '« Pas de souci. Vous auriez quand même 20 minutes cette semaine pour qu\'on en parle ? C\'est vraiment plus parlant en direct. »',
+                      },
+                      {
+                        label: '« On n\'a pas le temps »',
+                        reponse: '« C\'est exactement le problème que le système règle — il vous génère des RDV sans que vous leviez le petit doigt. 20 minutes suffit, plutôt cette semaine ou la semaine prochaine ? »',
+                      },
+                      {
+                        label: '« On travaille déjà avec quelqu\'un »',
+                        reponse: '« Pas de souci — est-ce qu\'ils vous bookent des RDV acheteurs automatiquement dans votre calendrier ? Parce que c\'est exactement ce qu\'on fait, et ça prend 20 minutes à voir. »',
+                      },
+                    ].map((obj, i) => (
+                      <div key={i} className="rounded-xl border border-slate-700 overflow-hidden">
+                        <button
+                          onClick={() => setScriptObjIndex(scriptObjIndex === i ? null : i)}
+                          className="w-full text-left px-4 py-3 bg-slate-800 hover:bg-slate-700 transition text-sm font-medium text-amber-300 flex items-center justify-between">
+                          <span>{obj.label}</span>
+                          <span className="text-slate-500 text-xs ml-2 flex-shrink-0">{scriptObjIndex === i ? '▲' : '▼'}</span>
+                        </button>
+                        {scriptObjIndex === i && (
+                          <div className="px-4 py-3 bg-amber-900/10 text-sm text-slate-300 leading-relaxed border-t border-slate-700">
+                            {obj.reponse}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
             </div>
           )}
         </div>
