@@ -9,6 +9,7 @@ export default function TelPage() {
   const [noSession, setNoSession] = useState(false)
   // readyToCall = true quand un nouveau numéro est détecté → plein écran vert "1 tap"
   const [readyToCall, setReadyToCall] = useState(false)
+  const [showProgress, setShowProgress] = useState(false)
   const prevIndexRef = useRef<number>(-1)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -138,7 +139,15 @@ export default function TelPage() {
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-green-400 text-sm font-medium">Session active</span>
         </div>
-        <span className="text-slate-400 text-sm">{idx} / {session.objectif}</span>
+        <button
+          onClick={() => setShowProgress(p => !p)}
+          className="text-slate-600 hover:text-slate-400 active:text-slate-300 transition text-xs px-2 py-1 rounded-lg"
+        >
+          {showProgress
+            ? <span className="flex items-center gap-1.5"><span className="text-slate-400">{idx} / {session.objectif}</span><span>👁</span></span>
+            : <span className="opacity-40">···</span>
+          }
+        </button>
       </div>
 
       {/* Contenu */}
@@ -166,18 +175,22 @@ export default function TelPage() {
           </svg>
         </a>
 
-        <p className="text-slate-700 text-sm">
-          {remaining > 0 ? `${remaining} restante${remaining > 1 ? 's' : ''}` : 'Dernière agence'}
-        </p>
+        {showProgress && (
+          <p className="text-slate-500 text-sm">
+            {remaining > 0 ? `${remaining} restante${remaining > 1 ? 's' : ''}` : 'Dernière agence'}
+          </p>
+        )}
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-slate-800 flex-shrink-0">
-        <div
-          className="h-full bg-green-500 transition-all duration-500"
-          style={{ width: `${Math.min(100, Math.round((idx / session.objectif) * 100))}%` }}
-        />
-      </div>
+      {/* Progress bar — masquée par défaut */}
+      {showProgress && (
+        <div className="h-1 bg-slate-800 flex-shrink-0">
+          <div
+            className="h-full bg-green-500 transition-all duration-500"
+            style={{ width: `${Math.min(100, Math.round((idx / session.objectif) * 100))}%` }}
+          />
+        </div>
+      )}
     </div>
   )
 }
