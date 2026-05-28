@@ -1,21 +1,31 @@
-import webpush from 'web-push'
 import { prisma } from './prisma'
 
-// VAPID config — clés générées une seule fois, stockées dans les env vars
-webpush.setVapidDetails(
-  'mailto:hugo@contact.agentry.fr',
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+// web-push is a CJS-only package — bypass TypeScript module resolution
+// The package is installed at runtime via node_modules
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let webpush: any
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  webpush = require('web-push')
+} catch {
+  webpush = null
+}
 
 /**
  * Envoie une notification push "prochain appel" sur le téléphone enregistré.
  * Ne fait rien si aucune subscription n'est enregistrée ou si les vars VAPID manquent.
  */
 export async function sendNextCallPush(nom: string, telephone: string) {
+  if (!webpush) return
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return
 
   try {
+    webpush.setVapidDetails(
+      'mailto:hugo@contact.agentry.fr',
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    )
+
     const param = await prisma.parametre.findUnique({ where: { cle: 'push_subscription' } })
     if (!param) return
 
