@@ -7,6 +7,7 @@ const nextConfig = {
       'puppeteer-core',
       'imapflow',
       'mailparser',
+      'web-push',
     ],
   },
 }
