@@ -11,6 +11,7 @@ import { Resend } from 'resend'
 import { DEFAULT_TEMPLATES } from '@/lib/email-templates'
 import { writeFullBackup, writeSessionReport } from '@/lib/backup'
 import { createRdvWithMeet } from '@/lib/google-calendar'
+import { sendNextCallPush } from '@/lib/push'
 
 // PATCH: met à jour une session (ajoute un appel, ou clôture la session)
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -211,6 +212,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       update: { compteur: { increment: 1 } },
       create: { date: today, objectif: session.objectif, compteur: 1 },
     })
+
+    // Envoyer push notification "prochain appel" sur le téléphone
+    try {
+      const queue: { nom?: string; telephone?: string }[] = session.agenceQueue ? JSON.parse(session.agenceQueue) : []
+      const nextIdx = session.appels.length + 1 // index de la prochaine agence après increment
+      const nextAgence = queue[nextIdx]
+      if (nextAgence?.telephone) {
+        sendNextCallPush(nextAgence.nom || 'Prochain appel', nextAgence.telephone).catch(() => {})
+      }
+    } catch { /* push optionnel */ }
 
     return NextResponse.json(appel)
   }

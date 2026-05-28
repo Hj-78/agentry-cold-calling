@@ -84,6 +84,43 @@ export default function TelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Enregistrer le service worker et la subscription push
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+    const setupPush = async () => {
+      try {
+        // Enregistrer le SW
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+
+        // Demander la permission
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') return
+
+        // S'abonner aux push
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        if (!vapidKey) return
+
+        const existing = await reg.pushManager.getSubscription()
+        const subscription = existing ?? await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapidKey,
+        })
+
+        // Envoyer la subscription au serveur
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subscription.toJSON()),
+        })
+      } catch (err) {
+        console.error('[PUSH SETUP]', err)
+      }
+    }
+
+    setupPush()
+  }, [])
+
   // Déclencher le décompte quand readyToCall devient true en mode auto
   useEffect(() => {
     if (readyToCall && autoMode) {
