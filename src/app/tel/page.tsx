@@ -16,6 +16,8 @@ export default function TelPage() {
     return localStorage.getItem('tel_autoMode') === '1'
   })
   const [countdown, setCountdown] = useState<number | null>(null)
+  const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'|'unsupported'>('unsupported')
+  const swRegRef = useRef<ServiceWorkerRegistration | null>(null)
   const prevIndexRef = useRef<number>(-1)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -84,42 +86,61 @@ export default function TelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Enregistrer le service worker et la subscription push
+  // Enregistrer le SW silencieusement + lire l'état actuel des permissions
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
-
-    const setupPush = async () => {
-      try {
-        // Enregistrer le SW
-        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
-
-        // Demander la permission
-        const perm = await Notification.requestPermission()
-        if (perm !== 'granted') return
-
-        // S'abonner aux push
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-        if (!vapidKey) return
-
-        const existing = await reg.pushManager.getSubscription()
-        const subscription = existing ?? await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: vapidKey,
-        })
-
-        // Envoyer la subscription au serveur
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subscription.toJSON()),
-        })
-      } catch (err) {
-        console.error('[PUSH SETUP]', err)
-      }
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
+      setNotifStatus('unsupported')
+      return
     }
 
-    setupPush()
+    // Lire l'état actuel de la permission
+    setNotifStatus(Notification.permission as 'default'|'granted'|'denied')
+
+    // Enregistrer le SW en arrière-plan (ne demande pas de permission)
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(reg => {
+        swRegRef.current = reg
+        // Si déjà autorisé → s'abonner automatiquement (refresh de page)
+        if (Notification.permission === 'granted') {
+          subscribeWithReg(reg)
+        }
+      })
+      .catch(err => console.error('[SW]', err))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const subscribeWithReg = async (reg: ServiceWorkerRegistration) => {
+    try {
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) return
+      const existing = await reg.pushManager.getSubscription()
+      const subscription = existing ?? await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidKey,
+      })
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription.toJSON()),
+      })
+    } catch (err) {
+      console.error('[PUSH SUBSCRIBE]', err)
+    }
+  }
+
+  // Appelé au tap du bouton "Activer les notifications"
+  const activerNotifications = async () => {
+    if (!('Notification' in window)) return
+    try {
+      const perm = await Notification.requestPermission()
+      setNotifStatus(perm as 'default'|'granted'|'denied')
+      if (perm === 'granted' && swRegRef.current) {
+        await subscribeWithReg(swRegRef.current)
+      }
+    } catch (err) {
+      console.error('[NOTIF PERM]', err)
+    }
+  }
 
   // Déclencher le décompte quand readyToCall devient true en mode auto
   useEffect(() => {
@@ -310,6 +331,26 @@ export default function TelPage() {
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
             <span className="text-green-400 text-xs font-medium">Auto-dial activé</span>
           </div>
+        )}
+
+        {/* Bouton activation notifications push */}
+        {notifStatus === 'default' && (
+          <button
+            onClick={activerNotifications}
+            className="mt-2 w-full max-w-xs bg-indigo-600 active:bg-indigo-500 text-white font-bold py-3 px-6 rounded-2xl text-sm flex items-center justify-center gap-2"
+          >
+            🔔 Activer les notifications
+          </button>
+        )}
+        {notifStatus === 'granted' && (
+          <div className="flex items-center gap-1.5 text-indigo-400 text-xs">
+            <span>🔔</span><span>Notifications actives</span>
+          </div>
+        )}
+        {notifStatus === 'denied' && (
+          <p className="text-slate-600 text-xs text-center px-4">
+            Notifications bloquées — active-les dans les réglages du navigateur
+          </p>
         )}
       </div>
 
