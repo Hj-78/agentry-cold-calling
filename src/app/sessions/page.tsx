@@ -341,6 +341,15 @@ export default function SessionsPage() {
             const rdvs = session.appels.filter(a => a.rdvPris).length
             const pitches = session.appels.filter(a => a.aPitche).length
             const pasRepondu = session.appels.filter(a => a.resultat === 'pas_repondu').length
+            // Répartition par script
+            const scriptLabels: Record<string, string> = { v1: 'V1', v2: 'V2', v3: 'V3', v4: 'V4' }
+            const appelsByScript = session.appels.reduce<Record<string, typeof session.appels>>((acc, a) => {
+              const v = a.scriptVersion || 'nc'
+              if (!acc[v]) acc[v] = []
+              acc[v].push(a)
+              return acc
+            }, {})
+            const scriptVersionsUsed = Object.keys(appelsByScript).filter(v => v !== 'nc').sort()
 
             return (
               <div key={session.id} className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden">
@@ -390,6 +399,47 @@ export default function SessionsPage() {
                         >
                           📋 Copier le résumé complet
                         </button>
+                      </div>
+                    )}
+
+                    {/* Répartition par script */}
+                    {scriptVersionsUsed.length > 0 && (
+                      <div className="px-8 py-5 border-b border-slate-800">
+                        <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">📊 Résultats par script</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {scriptVersionsUsed.map(v => {
+                            const appelsV = appelsByScript[v]
+                            const label = scriptLabels[v] ?? v.toUpperCase()
+                            const stats = [
+                              { key: 'interesse',    emoji: '✓', color: 'text-green-400', count: appelsV.filter(a => a.resultat === 'interesse').length },
+                              { key: 'rappeler',     emoji: '↩', color: 'text-amber-400', count: appelsV.filter(a => a.resultat === 'rappeler').length },
+                              { key: 'pas_interesse',emoji: '✕', color: 'text-red-400',   count: appelsV.filter(a => a.resultat === 'pas_interesse').length },
+                              { key: 'pas_repondu',  emoji: '📵', color: 'text-slate-400', count: appelsV.filter(a => a.resultat === 'pas_repondu').length },
+                              { key: 'messagerie',   emoji: '🔇', color: 'text-blue-400',  count: appelsV.filter(a => a.resultat === 'messagerie').length },
+                            ].filter(s => s.count > 0)
+                            return (
+                              <div key={v} className="bg-slate-800 rounded-2xl px-4 py-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-indigo-300 font-bold text-sm">{label}</span>
+                                  <span className="text-slate-500 text-xs">{appelsV.length} appel{appelsV.length > 1 ? 's' : ''}</span>
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                  {stats.length === 0
+                                    ? <span className="text-slate-600 text-xs">Aucun résultat enregistré</span>
+                                    : stats.map(s => (
+                                      <span key={s.key} className={`text-xs ${s.color}`}>
+                                        {s.emoji} {s.count}
+                                      </span>
+                                    ))
+                                  }
+                                  {appelsV.filter(a => a.rdvPris).length > 0 && (
+                                    <span className="text-xs text-yellow-400">📅 {appelsV.filter(a => a.rdvPris).length} RDV</span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     )}
 

@@ -16,6 +16,7 @@ export interface SessionAppel {
   rdvHeure?: string | null
   agenceEmail?: string | null
   noteRapide?: string | null
+  scriptVersion?: string | null
   createdAt: string
 }
 

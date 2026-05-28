@@ -128,5 +128,6 @@ model SessionAppel {
   rdvHeure        String?  // Heure du RDV (ex: "14:00")
   agenceEmail     String?  // Email de l'agence (pour auto-envoi)
   noteRapide      String?  // Note manuelle rapide
+  scriptVersion   String?  // Script utilisé : "v1" | "v2" | "v3" | "v4"
   createdAt       DateTime @default(now())
 }

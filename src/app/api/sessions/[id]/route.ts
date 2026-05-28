@@ -42,6 +42,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         rdvHeure: body.rdvHeure || null,
         agenceEmail: body.agenceEmail || null,
         noteRapide: body.noteRapide || null,
+        scriptVersion: body.scriptVersion || null,
       },
     })
 

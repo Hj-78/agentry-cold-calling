@@ -262,6 +262,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
         noteRapide: noteRapide
           ? `${noteRapide}${rappelJour ? ` [Rappel: ${rappelJour}${rappelPlage ? ` ${rappelPlage}` : ''}]` : ''}`
           : rappelJour ? `[Rappel: ${rappelJour}${rappelPlage ? ` ${rappelPlage}` : ''}]` : null,
+        scriptVersion: selectedScript,
       }),
     })
 
@@ -314,6 +315,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           rdvHeure: rdvHeure || null,
           agenceEmail: rdvEmailProspect || (currentAgence as unknown as { email?: string })?.email || null,
           noteRapide: noteRapide || null,
+          scriptVersion: selectedScript,
         }),
       })
     }
