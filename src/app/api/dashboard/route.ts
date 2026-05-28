@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 const JOURS_ACTIFS = [1, 2, 4, 5, 6] // lun, mar, jeu, ven, sam
-const OBJECTIF_MIN = 50
+const OBJECTIF_MIN = 150
 
 function todayStr() {
   return new Date().toISOString().split('T')[0]

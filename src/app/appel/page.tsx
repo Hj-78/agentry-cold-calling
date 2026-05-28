@@ -74,7 +74,7 @@ export default function AppelPhonePage() {
   const queue: AgenceQueue[] = session?.agenceQueue || []
   const current: AgenceQueue | null = session ? (queue[session.totalAppels] || null) : null
   const callNum = session ? session.totalAppels + 1 : 0
-  const total = session?.objectif || 50
+  const total = session?.objectif || 150
 
   // Swipe handlers pour qualifier rapidement
   const handleTouchStart = (e: React.TouchEvent) => {

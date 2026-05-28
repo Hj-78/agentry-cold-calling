@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { requestNotificationPermission } from '@/lib/notifications'
 
 export default function ParametresPage() {
-  const [objectifDefaut, setObjectifDefaut] = useState('50')
+  const [objectifDefaut, setObjectifDefaut] = useState('150')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [notifStatus, setNotifStatus] = useState<string>('')
