@@ -4,6 +4,17 @@ import { useState, useEffect } from 'react'
 import PowerDialer from '@/components/sessions/PowerDialer'
 import type { Session } from '@/lib/types'
 
+const DUREES = [
+  { label: '1h',   value: 3600 },
+  { label: '1h15', value: 4500 },
+  { label: '1h30', value: 5400 },
+  { label: '1h45', value: 6300 },
+  { label: '2h',   value: 7200 },
+  { label: '2h15', value: 8100 },
+  { label: '2h30', value: 9000 },
+  { label: '2h45', value: 9900 },
+]
+
 const RESULTATS: Record<string, { label: string; color: string }> = {
   interesse: { label: 'Intéressé', color: 'bg-green-800 text-green-200' },
   rappeler: { label: 'À rappeler', color: 'bg-amber-800 text-amber-200' },
@@ -34,6 +45,7 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [launching, setLaunching] = useState(false)
+  const [dureeChoisie, setDureeChoisie] = useState(3600)
   const [disponibles, setDisponibles] = useState<number | null>(null)
   const [villes, setVilles] = useState<CityCount[]>([])
   const [villesChoisies, setVillesChoisies] = useState<string[]>([]) // [] = toutes
@@ -74,7 +86,7 @@ export default function SessionsPage() {
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dureeObjectif: 3600, villes: villesChoisies.length > 0 ? villesChoisies : null }),
+      body: JSON.stringify({ dureeObjectif: dureeChoisie, villes: villesChoisies.length > 0 ? villesChoisies : null }),
     })
     const session = await res.json()
     if (!session.agenceQueue || session.agenceQueue.length === 0) {
@@ -235,19 +247,30 @@ export default function SessionsPage() {
           </div>
         )}
 
-        {/* Durée fixe + info agences dispo */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-3 flex items-center gap-3">
-            <span className="text-2xl">⏱</span>
-            <div>
-              <div className="text-white font-bold text-lg">1 heure</div>
-              <div className="text-slate-500 text-xs">durée de session</div>
-            </div>
+        {/* Sélecteur de durée */}
+        <div className="mb-5">
+          <label className="text-slate-400 text-sm block mb-3">⏱ Durée de session</label>
+          <div className="grid grid-cols-4 gap-2">
+            {DUREES.map(({ label, value }) => (
+              <button
+                key={value}
+                onClick={() => setDureeChoisie(value)}
+                className={`py-2.5 rounded-xl text-sm font-semibold transition border ${
+                  dureeChoisie === value
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3">
-            <div className="text-slate-300 font-semibold">{dispoTotal}</div>
-            <div className="text-slate-500 text-xs">{villesChoisies.length > 0 ? `agences dans ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : 'agences disponibles'}</div>
-          </div>
+        </div>
+
+        {/* Info agences dispo */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 mb-6">
+          <div className="text-slate-300 font-semibold">{dispoTotal}</div>
+          <div className="text-slate-500 text-xs">{villesChoisies.length > 0 ? `agences dans ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : 'agences disponibles'}</div>
         </div>
 
         {dispoTotal === 0 && (
@@ -261,7 +284,12 @@ export default function SessionsPage() {
           disabled={launching || dispoTotal === 0}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-bold text-lg md:text-xl transition active:scale-98 shadow-2xl shadow-indigo-900/50 min-h-[56px]"
         >
-          {launching ? 'Démarrage…' : villesChoisies.length > 0 ? `▶ Lancer la session (1h) — ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}` : '▶ Lancer la session (1h)'}
+          {(() => {
+            const label = DUREES.find(d => d.value === dureeChoisie)?.label ?? '1h'
+            if (launching) return 'Démarrage…'
+            if (villesChoisies.length > 0) return `▶ Lancer (${label}) — ${villesChoisies.length} ville${villesChoisies.length > 1 ? 's' : ''}`
+            return `▶ Lancer la session (${label})`
+          })()}
         </button>
 
         {/* Modal confirmation suppression ville */}

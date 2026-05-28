@@ -51,7 +51,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [showTranscription, setShowTranscription] = useState(false)
   const [showScript, setShowScript] = useState(false)
   const [scriptObjIndex, setScriptObjIndex] = useState<number | null>(null)
-  const [selectedScript, setSelectedScript] = useState<'v1'|'v2'|'v3'>('v1')
+  const [selectedScript, setSelectedScript] = useState<'v1'|'v2'|'v3'|'v4'>('v1')
   const [showRappelModal, setShowRappelModal] = useState(false)
   const [rappelJour, setRappelJour] = useState('')
   const [rappelPlage, setRappelPlage] = useState('')
@@ -701,14 +701,14 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
           {showScript && (
             <div className="border-t border-slate-800">
 
-              {/* Sélecteur V1 / V2 / V3 */}
-              <div className="flex gap-2 px-5 pt-4 pb-3">
-                {(['v1','v2','v3'] as const).map((v) => {
-                  const labels: Record<string, string> = { v1: 'V1 — Résultat', v2: 'V2 — Curiosité', v3: 'V3 — Problème' }
+              {/* Sélecteur V1 / V2 / V3 / V4 */}
+              <div className="grid grid-cols-2 gap-2 px-5 pt-4 pb-3">
+                {(['v1','v2','v3','v4'] as const).map((v) => {
+                  const labels: Record<string, string> = { v1: 'V1 — Résultat', v2: 'V2 — Curiosité', v3: 'V3 — Problème', v4: 'V4 — Direct' }
                   const active = selectedScript === v
                   return (
                     <button key={v} onClick={() => { setSelectedScript(v); setScriptObjIndex(null) }}
-                      className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${
+                      className={`py-2 rounded-xl text-xs font-semibold transition border ${
                         active
                           ? 'bg-indigo-600 border-indigo-500 text-white'
                           : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-indigo-600 hover:text-indigo-300'
@@ -721,8 +721,8 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
 
               <div className="px-5 pb-5 space-y-4">
 
-                {/* ── OUVERTURE (commune aux 3) ── */}
-                <div>
+                {/* ── OUVERTURE (commune à V1/V2/V3) ── */}
+                {selectedScript !== 'v4' && <div>
                   <div className="text-xs text-indigo-400 font-semibold uppercase tracking-wider mb-2">🎯 Ouverture</div>
                   <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
                     <p>« Bonjour, est-ce que je parle bien à <span className="text-indigo-300 font-medium">[Nom de l&apos;agence]</span> ? »</p>
@@ -730,7 +730,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                     <p className="mt-1">« Si je vous dis que c&apos;est un appel de prospection — vous raccrochez, ou vous me laissez <span className="text-indigo-300 font-medium">10 secondes</span> ? »</p>
                     <p className="text-slate-500 italic text-xs">(En général ils sourient et disent &quot;allez-y&quot;.)</p>
                   </div>
-                </div>
+                </div>}
 
                 {/* ── V1 — ANGLE RÉSULTAT ── */}
                 {selectedScript === 'v1' && (<>
@@ -826,6 +826,47 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                       <p>« Matin ou après-midi ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
                       <p>« Je note <span className="text-purple-300 font-medium">[jour] à [heure]</span>. Y a-t-il une raison pour laquelle vous ne pourriez pas être là ? Je vous pose la question parce qu&apos;on a d&apos;autres agences dans votre secteur — <span className="text-purple-300 font-medium">je veux vous donner la priorité</span>. »</p>
+                    </div>
+                  </div>
+                </>)}
+
+                {/* ── V4 — DIRECT / AGENTRY ── */}
+                {selectedScript === 'v4' && (<>
+                  <div>
+                    <div className="text-xs text-indigo-400 font-semibold uppercase tracking-wider mb-2">🎯 Ouverture</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Bonjour, je parle bien à <span className="text-indigo-300 font-medium">[Nom de l&apos;agence]</span> ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Confirme.)</p>
+                      <p>« Oui c&apos;est <span className="text-indigo-300 font-medium">Hugo de la société Agentry</span>, vous allez bien ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                      <p>« L&apos;idée de mon appel est simple — je travaille avec plusieurs agences immobilières au niveau de <span className="text-indigo-300 font-medium">l&apos;acquisition client</span>. »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">❓ Question capacité</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Vous pouvez monter jusqu&apos;à combien de <span className="text-cyan-300 font-medium">rendez-vous acheteurs supplémentaires</span> par mois sans vous surcharger ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Je vous explique — de notre côté on met en place un <span className="text-green-300 font-medium">système d&apos;acquisition local</span>, je sais pas si vous connaissez <span className="text-green-300 font-medium">Meta Ads</span>. »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                      <p>« La particularité c&apos;est qu&apos;on va vous créer un <span className="text-green-300 font-medium">système clé en main</span> par rapport à votre entreprise, on cible les prospects par rapport à vos critères, et vous recevez juste les rendez-vous dans votre calendrier. »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Closing</div>
+                    <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
+                      <p>« Ce que je vous propose c&apos;est qu&apos;on se prend un petit appel de <span className="text-purple-300 font-medium">20 minutes</span> où je vous montre exactement comment on fonctionne — et qu&apos;on puisse <span className="text-purple-300 font-medium">mettre un visage sur nos noms</span>. »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
                     </div>
                   </div>
                 </>)}
