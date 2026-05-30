@@ -44,6 +44,7 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
   const [rdvEmailProspect, setRdvEmailProspect] = useState('')
   const [noteRapide, setNoteRapide] = useState('')
   const [savingAppel, setSavingAppel] = useState(false)
+  const [skipping, setSkipping] = useState(false)
   const [ending, setEnding] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResume, setAiResume] = useState<{ resultat?: string; resume: string; pointsCles: string; prochaineAction: string } | null>(null)
@@ -218,6 +219,39 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rdvPris])
+
+  const skipAgence = async () => {
+    if (skipping || savingAppel) return
+    setSkipping(true)
+    stopListening()
+    // Reset fields sans sauvegarder
+    setTranscription('')
+    setInterimText('')
+    setResultat('')
+    setAPitche(null)
+    setRdvPris(false)
+    setRdvDate('')
+    setRdvHeure('')
+    setRdvEmailProspect('')
+    setNoteRapide('')
+    setRappelJour('')
+    setRappelPlage('')
+    setEmailSuiviSent(false)
+    setAiResume(null)
+    setCallElapsed(0)
+
+    await fetch(`/api/sessions/${session.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'skip_agence' }),
+    })
+
+    const updatedSession = await fetch(`/api/sessions/${session.id}`).then(r => r.json())
+    setSession({ ...updatedSession, agenceQueue: queue })
+    setQueueIndex(i => i + 1)
+    setSkipping(false)
+    setTimeout(() => startListening(), 300)
+  }
 
   const saveAndNext = async () => {
     if (savingAppel) return
@@ -984,11 +1018,20 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
       </div>
 
       {/* Bouton SUIVANT */}
-      <div className="bg-slate-900 border-t border-slate-800 px-5 py-4 flex-shrink-0">
-        <button onClick={saveAndNext} disabled={savingAppel || aiLoading}
+      <div className="bg-slate-900 border-t border-slate-800 px-5 py-4 flex-shrink-0 space-y-2">
+        <button onClick={saveAndNext} disabled={savingAppel || aiLoading || skipping}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white py-5 rounded-2xl text-lg md:text-xl font-bold transition active:scale-95 shadow-xl shadow-indigo-900/40 min-h-[64px]">
           {savingAppel || aiLoading ? '…' : `✓ Valider et agence suivante`}
         </button>
+        {currentAgence && (
+          <button
+            onClick={skipAgence}
+            disabled={skipping || savingAppel || aiLoading}
+            className="w-full bg-transparent border border-slate-700 hover:border-slate-500 disabled:opacity-30 text-slate-500 hover:text-slate-300 py-3 rounded-2xl text-sm font-medium transition active:scale-95"
+          >
+            {skipping ? '…' : '⏭ Passer cette agence'}
+          </button>
+        )}
       </div>
 
       {/* Modale Rappel */}

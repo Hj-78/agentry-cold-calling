@@ -18,6 +18,29 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const id = parseInt(params.id)
   const body = await req.json().catch(() => ({}))
 
+  // Passer une agence sans la compter comme un appel
+  if (body.action === 'skip_agence') {
+    const session = await prisma.session.findUnique({ where: { id }, include: { appels: true } })
+    if (!session) return NextResponse.json({ error: 'Session introuvable' }, { status: 404 })
+
+    await prisma.session.update({
+      where: { id },
+      data: { totalAppels: { increment: 1 } },
+    })
+
+    // Envoyer push notification pour l'agence suivante (après le skip)
+    try {
+      const queue: { nom?: string; telephone?: string }[] = session.agenceQueue ? JSON.parse(session.agenceQueue) : []
+      const nextIdx = session.totalAppels + 1 // après increment
+      const nextAgence = queue[nextIdx]
+      if (nextAgence?.telephone) {
+        sendNextCallPush(nextAgence.nom || 'Prochain appel', nextAgence.telephone).catch(() => {})
+      }
+    } catch { /* push optionnel */ }
+
+    return NextResponse.json({ ok: true, skipped: true })
+  }
+
   // Ajouter un appel à la session
   if (body.action === 'add_appel') {
     const session = await prisma.session.findUnique({ where: { id }, include: { appels: true } })
