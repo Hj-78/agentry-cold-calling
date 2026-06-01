@@ -771,28 +771,30 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                 {/* ── V1 — ANGLE RÉSULTAT ── */}
                 {selectedScript === 'v1' && (<>
                   <div>
-                    <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">📌 Angle</div>
+                    <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">📌 Question</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Après avoir échangé avec plusieurs agents dans votre secteur, on a remarqué que beaucoup avaient du mal à <span className="text-cyan-300 font-medium">générer des acheteurs qualifiés régulièrement</span>. C&apos;est quelque chose qui vous concerne ? »</p>
-                      <p className="text-slate-500 italic text-xs">(Si non → objections. Si oui → pitch.)</p>
+                      <p>« Juste avant de vous parler de ce qu&apos;on fait — vous cherchez à avoir plus d&apos;acheteurs qualifiés en ce moment, ou vous avez déjà ce qu&apos;il faut ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si déjà à fond :) « Ils arrivent comment chez vous — portails, bouche-à-oreille ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Puis :) « C&apos;est régulier sur l&apos;année, ou ça fait des creux ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si manque de régularité ou cherche → pitch. Si tout va bien → bonne continuation.)</p>
                     </div>
                   </div>
 
                   <div>
                     <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-2">
-                      <p>« C&apos;est exactement ce qu&apos;on règle. On vous amène entre <span className="text-green-300 font-medium">5 et 15 rendez-vous par mois</span> avec des acheteurs qualifiés, directement bookés dans votre calendrier. <span className="text-green-300 font-medium">Vous avez juste à faire le rendez-vous.</span> »</p>
+                      <p>« Ce qu&apos;on fait c&apos;est un système de pub sur Meta ciblé sur votre zone. La vraie différence avec une agence pub classique, c&apos;est qu&apos;on va jusqu&apos;au bout : dès qu&apos;un acheteur remplit le formulaire, on le contacte en <span className="text-green-300 font-medium">moins d&apos;une minute</span>, on le qualifie selon <span className="text-green-300 font-medium">vos critères à vous</span>, et il tombe directement dans votre calendrier. Vous arrivez juste pour le rendez-vous. »</p>
                       <p className="text-slate-500 italic text-xs">(S&apos;il demande comment :)</p>
-                      <p>« On met en place toute la pub et le système de qualification pour vous — les acheteurs passent par notre tunnel, ils sont qualifiés, et ils bookent directement dans votre agenda. »</p>
+                      <p>« Et on travaille avec <span className="text-green-300 font-medium">une seule agence par secteur</span> — si on bosse avec vous, vos concurrents directs n&apos;ont pas accès au même système. »</p>
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Rendez-vous</div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Closing</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« On sélectionne des agences partenaires dans votre secteur pour tester ça <span className="text-purple-300 font-medium">gratuitement</span>. Vous auriez <span className="text-purple-300 font-medium">20 minutes</span> cette semaine ? »</p>
+                      <p>« On cherche quelques agences partenaires pour tester ça <span className="text-purple-300 font-medium">gratuitement</span> dans votre secteur. Vous seriez opposé à <span className="text-purple-300 font-medium">un point de 20 minutes</span> pour que je vous montre concrètement ? »</p>
                       <p className="text-slate-500 italic text-xs">(Si oui :)</p>
-                      <p>« Parfait. Plutôt début ou fin de semaine ? »</p>
+                      <p>« Plutôt début ou fin de semaine ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le jour :)</p>
                       <p>« Matin ou après-midi ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
@@ -806,26 +808,28 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                   <div>
                     <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">🔍 Question curiosité</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Est-ce que vous avez des acheteurs qui vous contactent en ce moment, ou c&apos;est vous qui devez <span className="text-cyan-300 font-medium">aller les chercher</span> ? »</p>
-                      <p className="text-slate-500 italic text-xs">(Si &quot;je dois les chercher&quot; → pitch direct.)</p>
+                      <p>« J&apos;imagine que vous avez déjà été démarché par des agences pub avant ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si oui :) « Et ça s&apos;est passé comment ? Ils vous géraient juste la pub, ou ils allaient jusqu&apos;à vous booker des rendez-vous qualifiés directement dans votre agenda ? »</p>
+                      <p className="text-slate-500 italic text-xs">(En général juste la pub — c&apos;est là qu&apos;on se différencie.)</p>
+                      <p className="text-slate-500 italic text-xs">(Si pas encore démarché :) « Est-ce que vous avez des acheteurs qui vous contactent en ce moment, ou c&apos;est vous qui devez aller les chercher ? »</p>
                       <p className="text-slate-500 italic text-xs">(Si &quot;j&apos;en ai déjà&quot; :) « Ils bookent directement dans votre calendrier, ou vous devez les rappeler ? »</p>
-                      <p className="text-slate-500 italic text-xs">(Puis :) « Parce que c&apos;est ça qu&apos;on automatise entièrement — de la pub jusqu&apos;au booking dans votre agenda. »</p>
                     </div>
                   </div>
 
                   <div>
                     <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« On met en place tout le <span className="text-green-300 font-medium">système d&apos;acquisition</span> pour vous — les publicités Meta, le tunnel, les relances automatiques SMS et email. Les acheteurs passent par le tunnel, ils sont qualifiés, et ils bookent directement dans votre calendrier. »</p>
+                      <p>« C&apos;est exactement là où on fait autrement. Dès qu&apos;un acheteur remplit le formulaire, on le contacte en <span className="text-green-300 font-medium">moins d&apos;une minute</span>, on le qualifie selon <span className="text-green-300 font-medium">vos critères</span>, et il tombe directement dans votre calendrier. »</p>
+                      <p>« Et on travaille avec <span className="text-green-300 font-medium">une seule agence par zone</span> — si on bosse ensemble, vos concurrents n&apos;ont pas accès à ça. »</p>
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Rendez-vous</div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Closing</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« On cherche des agences partenaires dans votre secteur pour tester ça <span className="text-purple-300 font-medium">gratuitement</span>. Vous seriez curieux de voir comment ça marche en pratique ? <span className="text-purple-300 font-medium">20 minutes.</span> »</p>
+                      <p>« On cherche quelques agences pour tester ça <span className="text-purple-300 font-medium">gratuitement</span> dans votre secteur. Vous seriez opposé à voir comment ça marche en pratique — <span className="text-purple-300 font-medium">20 minutes</span> ? »</p>
                       <p className="text-slate-500 italic text-xs">(Si oui :)</p>
-                      <p>« Parfait. Plutôt début ou fin de semaine ? »</p>
+                      <p>« Plutôt début ou fin de semaine ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le jour :)</p>
                       <p>« Matin ou après-midi ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
@@ -839,29 +843,31 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                   <div>
                     <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">❓ Question problème</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Est-ce que vous avez la place dans votre calendrier pour accueillir entre <span className="text-cyan-300 font-medium">5 à 10 RDV acheteurs supplémentaires</span> ? »</p>
-                      <p className="text-slate-500 italic text-xs">(Si &quot;beaucoup&quot; ou soupire → continuer.)</p>
-                      <p className="text-slate-500 italic text-xs">(Si &quot;aucun, j&apos;ai déjà ce qu&apos;il faut&quot; → « Vous êtes bien organisé — bonne continuation. »)</p>
+                      <p>« Dites-moi — là en ce moment vos acheteurs ils arrivent comment chez vous ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si portails/bouche-à-oreille :) « Et c&apos;est assez régulier, ou des fois vous aimeriez avoir un flux plus prévisible ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si tout va bien :) « Vous avez la place pour <span className="text-cyan-300">5 à 10 RDV acheteurs</span> supplémentaires par mois, ou vous êtes déjà saturé ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Si saturé : « Vous êtes bien organisé — bonne continuation. »)</p>
                     </div>
                   </div>
 
                   <div>
                     <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« On met en place tout le <span className="text-green-300 font-medium">système d&apos;acquisition</span> pour vous — les publicités Meta, le tunnel, les relances automatiques SMS et email. Les acheteurs passent par le tunnel, ils sont qualifiés, et ils bookent directement dans votre calendrier. »</p>
+                      <p>« Ce qu&apos;on fait c&apos;est un système de pub Meta sur votre zone — mais la différence c&apos;est qu&apos;on va jusqu&apos;au bout. Dès qu&apos;un acheteur remplit le formulaire, on le contacte en <span className="text-green-300 font-medium">moins d&apos;une minute</span>, on le qualifie selon <span className="text-green-300 font-medium">vos critères</span>, et il se retrouve booké directement dans votre calendrier. »</p>
+                      <p>« Et on travaille avec <span className="text-green-300 font-medium">une seule agence par secteur</span> — vos concurrents directs n&apos;ont pas accès au même système. »</p>
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Rendez-vous</div>
+                    <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Closing</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« On cherche des agences pour tester ça <span className="text-purple-300 font-medium">gratuitement</span> dans votre secteur. Vous auriez <span className="text-purple-300 font-medium">20 minutes</span> cette semaine ? »</p>
+                      <p>« On cherche des agences pour tester ça <span className="text-purple-300 font-medium">gratuitement</span> dans votre secteur. Vous seriez opposé à ce qu&apos;on se prenne <span className="text-purple-300 font-medium">20 minutes</span> cette semaine ? »</p>
                       <p className="text-slate-500 italic text-xs">(Si oui :)</p>
-                      <p>« Parfait. Plutôt début ou fin de semaine ? »</p>
+                      <p>« Plutôt début ou fin de semaine ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le jour :)</p>
                       <p>« Matin ou après-midi ? »</p>
                       <p className="text-slate-500 italic text-xs">(Une fois le créneau :)</p>
-                      <p>« Je note <span className="text-purple-300 font-medium">[jour] à [heure]</span>. Y a-t-il une raison pour laquelle vous ne pourriez pas être là ? Je vous pose la question parce qu&apos;on a d&apos;autres agences dans votre secteur — <span className="text-purple-300 font-medium">je veux vous donner la priorité</span>. »</p>
+                      <p>« Je note <span className="text-purple-300 font-medium">[jour] à [heure]</span>. Y a-t-il une raison pour laquelle vous ne pourriez pas être là ? Je vous demande parce qu&apos;on a d&apos;autres agences dans votre secteur — <span className="text-purple-300 font-medium">je veux vous donner la priorité</span>. »</p>
                     </div>
                   </div>
                 </>)}
@@ -883,25 +889,25 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                   <div>
                     <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-2">❓ Question capacité</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Vous pouvez monter jusqu&apos;à combien de <span className="text-cyan-300 font-medium">rendez-vous acheteurs supplémentaires</span> par mois sans vous surcharger ? »</p>
-                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                      <p>« Avant de vous expliquer quoi que ce soit — juste pour voir si ça peut vous correspondre — vous pourriez absorber combien de <span className="text-cyan-300 font-medium">rendez-vous acheteurs supplémentaires</span> par mois sans vous surcharger ? »</p>
+                      <p className="text-slate-500 italic text-xs">(Réponse — écouter le chiffre.)</p>
+                      <p className="text-slate-500 italic text-xs">(S&apos;il dit peu ou saturé :) « Et ces acheteurs-là ils viennent d&apos;où principalement ? »</p>
                     </div>
                   </div>
 
                   <div>
                     <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2">🚀 Pitch</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Je vous explique — de notre côté on met en place un <span className="text-green-300 font-medium">système d&apos;acquisition local</span>, je sais pas si vous connaissez <span className="text-green-300 font-medium">Meta Ads</span>. »</p>
+                      <p>« Ce qu&apos;on fait — je sais pas si vous connaissez <span className="text-green-300 font-medium">Meta Ads</span> — c&apos;est qu&apos;on construit un système de pub ciblé sur votre zone avec <span className="text-green-300 font-medium">vos critères à vous</span>. La vraie différence c&apos;est qu&apos;on va jusqu&apos;au booking : dès qu&apos;un prospect remplit le formulaire, on le contacte en <span className="text-green-300 font-medium">moins d&apos;une minute</span>, on le qualifie, et il tombe directement dans votre calendrier. »</p>
                       <p className="text-slate-500 italic text-xs">(Réponse.)</p>
-                      <p>« La particularité c&apos;est qu&apos;on va vous créer un <span className="text-green-300 font-medium">système clé en main</span> par rapport à votre entreprise, on cible les prospects par rapport à vos critères, et vous recevez juste les rendez-vous dans votre calendrier. »</p>
-                      <p className="text-slate-500 italic text-xs">(Réponse.)</p>
+                      <p>« Et on travaille avec <span className="text-green-300 font-medium">une seule agence par secteur</span> — si on commence ensemble, vos concurrents directs n&apos;ont pas accès au même système. »</p>
                     </div>
                   </div>
 
                   <div>
                     <div className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">📍 Closing</div>
                     <div className="bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 leading-relaxed border border-slate-700 space-y-1.5">
-                      <p>« Ce que je vous propose c&apos;est qu&apos;on se prend un petit appel de <span className="text-purple-300 font-medium">20 minutes</span> où je vous montre exactement comment on fonctionne — et qu&apos;on puisse <span className="text-purple-300 font-medium">mettre un visage sur nos noms</span>. »</p>
+                      <p>« Ce que je vous propose c&apos;est qu&apos;on se prend un point de <span className="text-purple-300 font-medium">20 minutes</span> où je vous montre exactement comment ça fonctionne. Vous seriez opposé à ça ? »</p>
                       <p className="text-slate-500 italic text-xs">(Réponse.)</p>
                     </div>
                   </div>
@@ -913,20 +919,20 @@ export default function PowerDialer({ session: initialSession, onEnd }: PowerDia
                   <div className="space-y-2">
                     {[
                       {
-                        label: '« C\'est quoi exactement ? »',
-                        reponse: '« C\'est ce que je vous montre en 20 minutes — c\'est beaucoup plus clair à voir qu\'à expliquer. Vous êtes dispo plutôt le matin ou l\'après-midi ? »',
+                        label: '« Je suis pas intéressé »',
+                        reponse: '« Par les rendez-vous acheteurs en général, ou c\'est pas le bon moment ? » — Si timing : « Je comprends. Je peux vous rappeler dans 4 semaines ? »',
+                      },
+                      {
+                        label: '« J\'ai pas le temps »',
+                        reponse: '« C\'est exactement ce que ça règle — vous n\'avez plus à aller chercher les acheteurs. 20 minutes pour voir si ça peut vous faire gagner plusieurs heures par semaine ? »',
+                      },
+                      {
+                        label: '« J\'ai déjà quelqu\'un qui s\'en occupe »',
+                        reponse: '« Ils bookent les RDV directement dans votre calendrier, ou vous recevez des leads à rappeler ? » — La distinction crée l\'intérêt.',
                       },
                       {
                         label: '« Envoyez un mail »',
-                        reponse: '« Pas de souci. Vous auriez quand même 20 minutes cette semaine pour qu\'on en parle ? C\'est vraiment plus parlant en direct. »',
-                      },
-                      {
-                        label: '« On n\'a pas le temps »',
-                        reponse: '« C\'est exactement le problème que le système règle — il vous génère des RDV sans que vous leviez le petit doigt. 20 minutes suffit, plutôt cette semaine ou la semaine prochaine ? »',
-                      },
-                      {
-                        label: '« On travaille déjà avec quelqu\'un »',
-                        reponse: '« Pas de souci — est-ce qu\'ils vous bookent des RDV acheteurs automatiquement dans votre calendrier ? Parce que c\'est exactement ce qu\'on fait, et ça prend 20 minutes à voir. »',
+                        reponse: '« Je peux. Mais c\'est vraiment plus clair en 5 minutes à l\'oral. Vous seriez dispo cette semaine ? »',
                       },
                     ].map((obj, i) => (
                       <div key={i} className="rounded-xl border border-slate-700 overflow-hidden">
